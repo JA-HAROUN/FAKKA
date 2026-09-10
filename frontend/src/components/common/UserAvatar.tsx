@@ -2,9 +2,9 @@ import { cn } from "@/lib/utils";
 import type { User } from "@/types";
 
 const sizes = {
-  xs: "size-6 text-[11px]",
-  sm: "size-8 text-xs",
-  md: "size-9 text-sm",
+  xs: "size-6 text-caption",
+  sm: "size-8 text-caption",
+  md: "size-9 text-label",
   lg: "size-12 text-base",
 } as const;
 

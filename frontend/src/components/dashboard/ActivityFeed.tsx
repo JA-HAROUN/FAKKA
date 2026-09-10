@@ -41,21 +41,21 @@ export function ActivityFeed({ activity }: { activity: ActivityEvent[] }) {
                   <Link
                     to="/group/$groupId"
                     params={{ groupId: event.groupId }}
-                    className="row-hover flex items-center gap-3 p-4"
+                    className="row-hover flex items-center gap-3 p-4 sm:gap-4 sm:px-5"
                   >
                     <span
                       className={
                         isExpense
-                          ? "grid size-9 shrink-0 place-items-center rounded-lg border border-border bg-surface text-muted-foreground"
-                          : "grid size-9 shrink-0 place-items-center rounded-lg border border-border bg-positive-soft text-positive"
+                          ? "grid size-9 shrink-0 place-items-center rounded-md border border-border bg-surface text-muted-foreground"
+                          : "grid size-9 shrink-0 place-items-center rounded-md border border-border bg-positive-soft text-positive"
                       }
                       aria-hidden
                     >
                       <Icon className="size-4" />
                     </span>
                     <div className="min-w-0 flex-1">
-                      <p className="text-sm font-medium">{title}</p>
-                      <p className="truncate text-xs text-muted-foreground">{meta}</p>
+                      <p className="truncate text-body font-semibold">{title}</p>
+                      <p className="truncate text-caption text-muted-foreground">{meta}</p>
                     </div>
                     <div className="shrink-0 text-right">
                       <Money
@@ -63,7 +63,7 @@ export function ActivityFeed({ activity }: { activity: ActivityEvent[] }) {
                         size="sm"
                         tone={isExpense ? "plain" : "positive"}
                       />
-                      <p className="text-xs text-muted-foreground">
+                      <p className="text-caption text-muted-foreground">
                         {formatRelativeDate(event.at)}
                       </p>
                     </div>

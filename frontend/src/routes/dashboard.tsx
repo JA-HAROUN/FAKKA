@@ -3,10 +3,10 @@ import { Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { RequireAuth } from "@/components/common/RequireAuth";
 import { EmptyState } from "@/components/common/EmptyState";
-import { PageHeader, Panel, PanelList, Section } from "@/components/common/Section";
+import { PageHeader, Section } from "@/components/common/Section";
 import { ActivityFeed } from "@/components/dashboard/ActivityFeed";
 import { CreateGroupDialog } from "@/components/dashboard/CreateGroupDialog";
-import { GroupRow } from "@/components/dashboard/GroupRow";
+import { GroupCard } from "@/components/dashboard/GroupRow";
 import { PeopleBalances } from "@/components/dashboard/PeopleBalances";
 import { PositionSummary } from "@/components/dashboard/PositionSummary";
 import { useApp } from "@/context/AppContext";
@@ -79,13 +79,11 @@ function DashboardPage() {
       <div className="grid gap-6 lg:gap-8 xl:grid-cols-[minmax(0,1fr)_22rem] 2xl:grid-cols-[minmax(0,1fr)_24rem]">
         <div className="min-w-0 space-y-6 lg:space-y-8">
           <Section title="Your groups" description="Most recently active first.">
-            <Panel flush>
-              <PanelList>
-                {summaries.map((summary) => (
-                  <GroupRow key={summary.group.id} summary={summary} />
-                ))}
-              </PanelList>
-            </Panel>
+            <ul className="grid gap-4 sm:grid-cols-2">
+              {summaries.map((summary) => (
+                <GroupCard key={summary.group.id} summary={summary} />
+              ))}
+            </ul>
           </Section>
 
           <ActivityFeed activity={activity} />

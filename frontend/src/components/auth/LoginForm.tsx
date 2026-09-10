@@ -27,7 +27,7 @@ export function LoginForm({ onSuccess }: { onSuccess: () => void }) {
 
   return (
     <form
-      className="space-y-4"
+      className="space-y-5"
       noValidate
       onSubmit={(e) => {
         e.preventDefault();
@@ -65,7 +65,7 @@ export function LoginForm({ onSuccess }: { onSuccess: () => void }) {
         Sign in
       </Button>
 
-      <p className="text-center text-xs text-muted-foreground">
+      <p className="text-center text-caption text-muted-foreground">
         Demo account is pre-filled — any password works.
       </p>
     </form>

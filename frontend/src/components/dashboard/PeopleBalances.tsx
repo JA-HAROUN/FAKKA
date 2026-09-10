@@ -44,8 +44,8 @@ export function PeopleBalances({ people }: { people: CounterpartyBalance[] }) {
                 <>
                   <UserAvatar user={user} size="md" />
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium">{user.name}</p>
-                    <p className="truncate text-xs text-muted-foreground">
+                    <p className="truncate text-body font-semibold">{user.name}</p>
+                    <p className="truncate text-caption text-muted-foreground">
                       {theyOweMe ? "owes you" : "you owe"}
                       {relatedGroups.length > 0 &&
                         ` · ${relatedGroups.map((g) => g.name).join(", ")}`}
@@ -53,6 +53,7 @@ export function PeopleBalances({ people }: { people: CounterpartyBalance[] }) {
                   </div>
                   <Money
                     value={Math.abs(entry.amount)}
+                    size="lg"
                     tone={theyOweMe ? "positive" : "negative"}
                   />
                 </>

@@ -33,14 +33,16 @@ export function PositionSummary({
     <section className="panel p-5 sm:p-6" aria-label="Your overall position">
       <div className="grid gap-6 md:grid-cols-[minmax(0,1fr)_auto] md:items-center md:gap-10">
         <div className="space-y-1.5">
-          <h2 className="text-xs font-medium text-muted-foreground">Net balance</h2>
+          <h2 className="eyebrow">Net balance</h2>
           <p>
             <Money value={position.net} size="2xl" tone={tone} signed />
           </p>
-          <p className="text-sm text-muted-foreground">{summaryLine}</p>
+          <p className="text-body text-muted-foreground">{summaryLine}</p>
         </div>
 
-        <dl className="grid grid-cols-2 gap-px overflow-hidden rounded-lg border border-border bg-border md:min-w-[22rem]">
+        {/* Two recessed tiles rather than a hairline-divided block: the same
+            pairing, without drawing hard rules through the card. */}
+        <dl className="grid grid-cols-2 gap-3 md:min-w-[22rem]">
           <Figure
             icon={ArrowDownLeft}
             tone="positive"
@@ -80,17 +82,17 @@ function Figure({
 }) {
   const isZero = value < 0.005;
   return (
-    <div className="bg-card p-4">
-      <dt className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+    <div className="panel-inset p-4">
+      <dt className="eyebrow flex items-center gap-1.5">
         <Icon
           className={tone === "positive" ? "size-3.5 text-positive" : "size-3.5 text-negative"}
           aria-hidden
         />
         {label}
       </dt>
-      <dd className="mt-1.5">
+      <dd className="mt-2">
         <Money value={value} size="lg" tone={isZero ? "neutral" : tone} />
-        <span className="mt-0.5 block text-xs text-muted-foreground">{hint}</span>
+        <span className="mt-0.5 block text-caption text-muted-foreground">{hint}</span>
       </dd>
     </div>
   );

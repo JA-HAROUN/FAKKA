@@ -11,6 +11,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { UserAvatar } from "@/components/common/UserAvatar";
+import { ThemeToggle } from "@/components/common/ThemeToggle";
 import { useApp } from "@/context/AppContext";
 import { cn } from "@/lib/utils";
 
@@ -43,7 +44,9 @@ function BrandMark({ className }: { className?: string }) {
   return (
     <span
       className={cn(
-        "grid size-8 shrink-0 place-items-center rounded-lg bg-primary text-sm font-bold text-primary-foreground",
+        // rounded-md, not -lg: on a 32px tile the 16px radius would round it
+        // into a circle and the brand mark would read as an avatar.
+        "grid size-8 shrink-0 place-items-center rounded-md bg-primary text-sm font-bold text-primary-foreground",
         className,
       )}
       aria-hidden
@@ -85,8 +88,9 @@ function DesktopSidebar() {
         ))}
       </nav>
 
-      <div className="border-t border-border p-3">
+      <div className="flex items-center gap-1 border-t border-border p-3">
         <AccountMenu align="start" side="top" fullWidth />
+        <ThemeToggle />
       </div>
     </aside>
   );
@@ -100,7 +104,10 @@ function MobileTopBar() {
           <BrandMark />
           <span className="text-[15px] font-semibold tracking-tight">Fakka</span>
         </Link>
-        <AccountMenu align="end" side="bottom" />
+        <div className="flex items-center gap-1">
+          <ThemeToggle />
+          <AccountMenu align="end" side="bottom" />
+        </div>
       </div>
     </header>
   );
@@ -159,7 +166,7 @@ function AccountMenu({
           variant="ghost"
           className={cn(
             "h-auto gap-2.5 px-2 py-2",
-            fullWidth ? "w-full justify-start" : "justify-center",
+            fullWidth ? "w-full min-w-0 flex-1 justify-start" : "justify-center",
           )}
           aria-label="Account menu"
         >

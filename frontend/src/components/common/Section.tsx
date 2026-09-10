@@ -25,8 +25,10 @@ export function PageHeader({
       {back}
       <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-3">
         <div className="min-w-0 space-y-1">
-          <h1 className="truncate text-xl font-semibold tracking-tight sm:text-2xl">{title}</h1>
-          {description && <p className="text-sm text-muted-foreground">{description}</p>}
+          <h1 className="truncate text-title font-extrabold tracking-tight sm:text-display">
+            {title}
+          </h1>
+          {description && <p className="text-body text-muted-foreground">{description}</p>}
         </div>
         {actions && <div className="flex shrink-0 items-center gap-2">{actions}</div>}
       </div>
@@ -56,7 +58,9 @@ export function Section({
         <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
           <div className="min-w-0">
             {title && <Heading className="section-label truncate">{title}</Heading>}
-            {description && <p className="mt-0.5 text-xs text-muted-foreground">{description}</p>}
+            {description && (
+              <p className="mt-0.5 text-caption text-muted-foreground">{description}</p>
+            )}
           </div>
           {actions && <div className="flex shrink-0 items-center gap-2">{actions}</div>}
         </div>
@@ -77,7 +81,7 @@ export function Panel({
   flush?: boolean;
 }) {
   return (
-    <div className={cn("panel", flush ? "overflow-hidden" : "p-4 sm:p-5", className)}>
+    <div className={cn("panel", flush ? "overflow-hidden" : "p-5 sm:p-6", className)}>
       {children}
     </div>
   );

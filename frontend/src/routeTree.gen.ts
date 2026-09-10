@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as FriendsRouteImport } from './routes/friends'
+import { Route as StylePreviewRouteImport } from './routes/style-preview'
 import { Route as GroupGroupIdRouteImport } from './routes/group.$groupId'
 
 const IndexRoute = IndexRouteImport.update({
@@ -29,6 +30,11 @@ const FriendsRoute = FriendsRouteImport.update({
   path: '/friends',
   getParentRoute: () => rootRouteImport,
 } as any)
+const StylePreviewRoute = StylePreviewRouteImport.update({
+  id: '/style-preview',
+  path: '/style-preview',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const GroupGroupIdRoute = GroupGroupIdRouteImport.update({
   id: '/group/$groupId',
   path: '/group/$groupId',
@@ -39,12 +45,14 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/dashboard': typeof DashboardRoute
   '/friends': typeof FriendsRoute
+  '/style-preview': typeof StylePreviewRoute
   '/group/$groupId': typeof GroupGroupIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/dashboard': typeof DashboardRoute
   '/friends': typeof FriendsRoute
+  '/style-preview': typeof StylePreviewRoute
   '/group/$groupId': typeof GroupGroupIdRoute
 }
 export interface FileRoutesById {
@@ -52,20 +60,29 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/dashboard': typeof DashboardRoute
   '/friends': typeof FriendsRoute
+  '/style-preview': typeof StylePreviewRoute
   '/group/$groupId': typeof GroupGroupIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/dashboard' | '/friends' | '/group/$groupId'
+  fullPaths:
+    '/' | '/dashboard' | '/friends' | '/style-preview' | '/group/$groupId'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/dashboard' | '/friends' | '/group/$groupId'
-  id: '__root__' | '/' | '/dashboard' | '/friends' | '/group/$groupId'
+  to: '/' | '/dashboard' | '/friends' | '/style-preview' | '/group/$groupId'
+  id:
+    | '__root__'
+    | '/'
+    | '/dashboard'
+    | '/friends'
+    | '/style-preview'
+    | '/group/$groupId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   DashboardRoute: typeof DashboardRoute
   FriendsRoute: typeof FriendsRoute
+  StylePreviewRoute: typeof StylePreviewRoute
   GroupGroupIdRoute: typeof GroupGroupIdRoute
 }
 
@@ -92,6 +109,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof FriendsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/style-preview': {
+      id: '/style-preview'
+      path: '/style-preview'
+      fullPath: '/style-preview'
+      preLoaderRoute: typeof StylePreviewRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/group/$groupId': {
       id: '/group/$groupId'
       path: '/group/$groupId'
@@ -106,6 +130,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   DashboardRoute: DashboardRoute,
   FriendsRoute: FriendsRoute,
+  StylePreviewRoute: StylePreviewRoute,
   GroupGroupIdRoute: GroupGroupIdRoute,
 }
 export const routeTree = rootRouteImport

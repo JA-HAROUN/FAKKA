@@ -10,12 +10,12 @@ export function PasswordInput({ className, ...props }: ComponentProps<"input">) 
 
   return (
     <div className="relative">
-      <Input {...props} type={visible ? "text" : "password"} className={cn("pr-10", className)} />
+      <Input {...props} type={visible ? "text" : "password"} className={cn("pr-11", className)} />
       <button
         type="button"
         onClick={() => setVisible((v) => !v)}
         aria-label={visible ? "Hide password" : "Show password"}
-        className="absolute inset-y-0 right-0 grid w-10 cursor-pointer place-items-center rounded-r-md text-muted-foreground transition-colors hover:text-foreground"
+        className="absolute inset-y-0 right-0 grid w-11 cursor-pointer place-items-center rounded-r-xl text-muted-foreground transition-colors hover:text-foreground"
       >
         <Icon className="size-4" aria-hidden />
       </button>

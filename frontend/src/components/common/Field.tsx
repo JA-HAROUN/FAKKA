@@ -32,7 +32,7 @@ export function Field({
 
   return (
     <div className={cn("space-y-1.5", className)}>
-      <Label htmlFor={id} className="text-[13px] font-medium">
+      <Label htmlFor={id} className="text-label font-semibold">
         {label}
         {required && (
           <span className="ml-0.5 text-negative" aria-hidden>
@@ -48,13 +48,13 @@ export function Field({
       {error ? (
         <p
           id={`${id}-error`}
-          className="flex items-center gap-1.5 text-xs font-medium text-negative"
+          className="flex items-center gap-1.5 text-caption font-medium text-negative"
         >
           <AlertCircle className="size-3.5 shrink-0" aria-hidden />
           {error}
         </p>
       ) : hint ? (
-        <p id={`${id}-hint`} className="text-xs text-muted-foreground">
+        <p id={`${id}-hint`} className="text-caption text-muted-foreground">
           {hint}
         </p>
       ) : null}
@@ -68,7 +68,7 @@ export function FormError({ message }: { message?: string | null | undefined }) 
   return (
     <p
       role="alert"
-      className="flex items-start gap-2 rounded-md border border-negative/25 bg-negative-soft px-3 py-2 text-[13px] font-medium text-negative"
+      className="flex items-start gap-2 rounded-md border border-negative/25 bg-negative-soft px-3 py-2.5 text-label font-medium text-negative"
     >
       <AlertCircle className="mt-0.5 size-3.5 shrink-0" aria-hidden />
       {message}

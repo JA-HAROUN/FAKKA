@@ -27,19 +27,27 @@ const toneSurface: Record<Tone, string> = {
 };
 
 const toneDot: Record<Tone, string> = {
-  positive: "bg-positive",
-  negative: "bg-negative",
+  // The vivid `-strong` weights: a 6px dot needs more chroma than body text to
+  // register at all, and it carries no text contrast requirement.
+  positive: "bg-positive-strong",
+  negative: "bg-negative-strong",
   neutral: "bg-neutral",
   plain: "bg-foreground",
 };
 
+/**
+ * Small sizes are ordinary type tokens; from `lg` up a figure becomes the
+ * loudest thing in its container and switches to the `amount-*` scale (bolder,
+ * tighter, tabular). The weight lives here rather than in the base class so
+ * the `amount-*` utilities own it outright.
+ */
 const sizes = {
-  xs: "text-xs",
-  sm: "text-[13px]",
-  md: "text-sm",
-  lg: "text-lg",
-  xl: "text-2xl tracking-tight",
-  "2xl": "text-2xl tracking-tight sm:text-3xl",
+  xs: "text-caption font-semibold",
+  sm: "text-label font-semibold",
+  md: "text-body font-semibold",
+  lg: "amount-sm",
+  xl: "amount-md",
+  "2xl": "amount-lg sm:amount-xl",
 } as const;
 
 export function Money({
@@ -58,7 +66,7 @@ export function Money({
 }) {
   const resolved: Tone = tone === "auto" ? toneOf(value) : tone;
   return (
-    <span className={cn("font-semibold tabular-nums", sizes[size], toneText[resolved], className)}>
+    <span className={cn("tabular-nums", sizes[size], toneText[resolved], className)}>
       {signed ? formatSigned(value) : formatAmount(value)}
     </span>
   );
@@ -84,16 +92,16 @@ export function BalanceStatement({
 }) {
   const tone = toneOf(amount);
   return (
-    <div className={cn("space-y-0.5", className)}>
-      <p className="text-xs font-medium text-muted-foreground">{label ?? balanceLabel(amount)}</p>
+    <div className={cn("space-y-1", className)}>
+      <p className="eyebrow">{label ?? balanceLabel(amount)}</p>
       <p>
         <Money value={amount} size={size} tone={tone} />
         {tone === "neutral" && !party && (
-          <span className="ml-1.5 text-xs font-medium text-muted-foreground">all settled</span>
+          <span className="ml-1.5 text-caption font-medium text-muted-foreground">all settled</span>
         )}
       </p>
       {party && (
-        <p className="truncate text-xs text-muted-foreground">
+        <p className="truncate text-caption text-muted-foreground">
           {tone === "negative" ? "to" : "from"} {party}
         </p>
       )}
@@ -118,16 +126,14 @@ export function BalanceIndicator({
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium",
+        "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-caption font-semibold",
         toneSurface[tone],
         className,
       )}
     >
       <span className={cn("size-1.5 shrink-0 rounded-full", toneDot[tone])} aria-hidden />
       <span>{label ?? balanceLabel(amount)}</span>
-      {tone !== "neutral" && (
-        <span className="font-semibold tabular-nums">{formatAmount(amount)}</span>
-      )}
+      {tone !== "neutral" && <span className="font-bold tabular-nums">{formatAmount(amount)}</span>}
     </span>
   );
 }

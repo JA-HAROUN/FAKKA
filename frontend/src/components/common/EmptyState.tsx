@@ -30,14 +30,14 @@ export function EmptyState({
         className,
       )}
     >
-      <span className="grid size-10 place-items-center rounded-lg bg-surface text-muted-foreground">
+      <span className="grid size-11 place-items-center rounded-lg bg-surface text-muted-foreground">
         <Icon className="size-5" aria-hidden />
       </span>
-      <h3 className="text-sm font-semibold">{title}</h3>
+      <h3 className="text-lead font-bold tracking-tight">{title}</h3>
       {description && (
-        <p className="max-w-xs text-sm text-balance text-muted-foreground">{description}</p>
+        <p className="max-w-xs text-body text-balance text-muted-foreground">{description}</p>
       )}
-      {action && <div className="mt-2">{action}</div>}
+      {action && <div className="mt-3">{action}</div>}
     </div>
   );
 }

@@ -31,7 +31,7 @@ export function RegisterForm({ onSuccess }: { onSuccess: () => void }) {
 
   return (
     <form
-      className="space-y-4"
+      className="space-y-5"
       noValidate
       onSubmit={(e) => {
         e.preventDefault();
