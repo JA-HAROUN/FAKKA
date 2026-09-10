@@ -1,0 +1,419 @@
+@import "tailwindcss" source(none);
+@source "../src";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+/*
+ * ─────────────────────────────────────────────────────────────────────────────
+ * Fakka design system — "petrol ledger"
+ * ─────────────────────────────────────────────────────────────────────────────
+ * A calm, trustworthy fintech surface: white sheets floating on a cool paper
+ * canvas, one deep petrol-teal that owns every action, and money rendered as
+ * the loudest thing on the page. Four rules keep it coherent.
+ *
+ * 1. BRAND IS DEEP PETROL TEAL (`--primary`, hue ~200). It drives every
+ *    primary button, active tab, active nav item and link — the one colour
+ *    users learn to tap. Deliberately DEEP and LOW-CHROMA so it never
+ *    competes with money colour for attention.
+ *
+ * 2. MONEY HAS ITS OWN COLOUR LANGUAGE, and the brand never borrows it:
+ *       --positive*   you are owed        (green, hue ~150)
+ *       --negative*   you owe             (red,   hue ~27)
+ *       --neutral*    settled / zero      (grey)
+ *    Each comes in three weights — a readable text shade, a pale `-soft` pill
+ *    background, and a vivid `-strong` for dots, bars and solid fills.
+ *    Teal sits only ~55° from the positive green, so the two are separated by
+ *    WEIGHT instead of hue: the brand is dark and muted (L≈0.42, C≈0.06) while
+ *    positive is mid and vivid (L≈0.53, C≈0.14), and the green stays
+ *    yellow-leaning rather than drifting toward teal. The accent is never used
+ *    as a fill next to a balance figure — that space belongs to green/red/grey.
+ *    Colour is never the only signal either: every tone is paired with a
+ *    written label (see `Money`, `BalanceIndicator`).
+ *
+ * 3. CARDS ARE SOFT AND GENEROUS. White sheets, 16–20px radius, a shadow you
+ *    can actually see rather than a hairline whisper, generous inner padding.
+ *    In dark mode elevation comes from SURFACE LIGHTNESS (canvas → surface →
+ *    card → popover each step lighter), not from bigger shadows.
+ *
+ * 4. TYPE IS A NAMED SCALE, NOT ARBITRARY PIXELS. `text-caption` → `display`
+ *    for prose, and the `amount-*` utilities for figures (bold, tight, tabular).
+ *    Reach for a token, never `text-[13px]`.
+ *
+ * Type scale: eyebrow 11 tracked caps · caption 12 · label 13 · body 14 ·
+ * lead 15 · subtitle 17 · title 22 · display 28 — money 18 / 22 / 28 / 40.
+ */
+
+@theme inline {
+  /* Radius: 16px base. Cards run 20–24px, controls 12–16px, and pills
+     (CTAs, badges, avatars, dots) go fully rounded. */
+  --radius-xs: 0.375rem; /*  6px */
+  --radius-sm: 0.5rem; /*  8px */
+  --radius-md: 0.75rem; /* 12px */
+  --radius-lg: var(--radius); /* 16px */
+  --radius-xl: 1.25rem; /* 20px */
+  --radius-2xl: 1.5rem; /* 24px */
+  --radius-3xl: 2rem; /* 32px */
+  --radius-4xl: 2.5rem; /* 40px */
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-surface: var(--surface);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary-soft: var(--primary-soft);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-positive: var(--positive);
+  --color-positive-foreground: var(--positive-foreground);
+  --color-positive-soft: var(--positive-soft);
+  --color-positive-strong: var(--positive-strong);
+  --color-negative: var(--negative);
+  --color-negative-foreground: var(--negative-foreground);
+  --color-negative-soft: var(--negative-soft);
+  --color-negative-strong: var(--negative-strong);
+  --color-neutral: var(--neutral);
+  --color-neutral-soft: var(--neutral-soft);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-ring-offset-background: var(--background);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-chart-6: var(--chart-6);
+  --color-chart-7: var(--chart-7);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+
+  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+
+  /* Named type scale. Use these instead of arbitrary `text-[13px]` values so
+     every screen speaks the same sizes. Body (14px) is the document default. */
+  --text-caption: 0.75rem; /* 12 — metadata, timestamps */
+  --text-caption--line-height: 1.45;
+  --text-label: 0.8125rem; /* 13 — form labels, dense rows */
+  --text-label--line-height: 1.45;
+  --text-body: 0.875rem; /* 14 — body copy */
+  --text-body--line-height: 1.55;
+  --text-lead: 0.9375rem; /* 15 — emphasised body, section titles */
+  --text-lead--line-height: 1.5;
+  --text-subtitle: 1.0625rem; /* 17 — card titles */
+  --text-subtitle--line-height: 1.35;
+  --text-title: 1.375rem; /* 22 — page titles */
+  --text-title--line-height: 1.2;
+  --text-display: 1.75rem; /* 28 — hero headline */
+  --text-display--line-height: 1.15;
+
+  /* Elevation: cards float on a soft, cool-toned shadow. The tint is a
+     runtime variable so dark mode can swap to a deeper, opaquer black —
+     a light-mode shadow is invisible on a dark canvas. */
+  --shadow-xs: 0 1px 2px var(--shadow-tint-weak);
+  --shadow-sm: 0 1px 3px var(--shadow-tint-weak), 0 1px 2px -1px var(--shadow-tint-base);
+  --shadow-md: 0 4px 10px -2px var(--shadow-tint-base), 0 12px 24px -8px var(--shadow-tint-base);
+  --shadow-lg: 0 8px 16px -4px var(--shadow-tint-base), 0 28px 56px -20px var(--shadow-tint-strong);
+}
+
+:root {
+  --radius: 1rem;
+  color-scheme: light;
+
+  /* Neutrals — cool paper canvas, white cards. A faint teal cast in the greys
+     ties the whole surface to the brand without reading as "coloured". */
+  --background: oklch(0.982 0.004 210);
+  --foreground: oklch(0.215 0.022 235);
+  --surface: oklch(0.965 0.006 215);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.215 0.022 235);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.215 0.022 235);
+  --secondary: oklch(0.965 0.006 215);
+  --secondary-foreground: oklch(0.305 0.02 232);
+  --muted: oklch(0.965 0.006 215);
+  /* L 0.532, not lighter: this sits on --surface (the palest thing it lands on)
+     at 4.7:1. At L 0.548 that pairing measures 4.42:1 and fails AA. */
+  --muted-foreground: oklch(0.532 0.019 225);
+  --accent: oklch(0.955 0.021 199);
+  --accent-foreground: oklch(0.36 0.055 200);
+  --border: oklch(0.925 0.008 220);
+  --border-strong: oklch(0.845 0.013 220);
+  --input: oklch(0.885 0.011 220);
+
+  /* Brand — deep petrol teal. Every primary action, nothing else. */
+  --primary: oklch(0.418 0.062 202);
+  --primary-foreground: oklch(1 0 0);
+  --primary-soft: oklch(0.956 0.022 200);
+
+  /* Money semantics — see rule 2. */
+  --positive: oklch(0.527 0.137 150.1);
+  --positive-foreground: oklch(1 0 0);
+  --positive-soft: oklch(0.962 0.043 156.7);
+  --positive-strong: oklch(0.723 0.192 149.6);
+  --negative: oklch(0.505 0.19 27.5);
+  --negative-foreground: oklch(1 0 0);
+  --negative-soft: oklch(0.936 0.031 17.7);
+  --negative-strong: oklch(0.637 0.208 25.3);
+  --neutral: oklch(0.532 0.019 225);
+  --neutral-soft: oklch(0.965 0.006 215);
+
+  --destructive: oklch(0.545 0.215 27.3);
+  --destructive-foreground: oklch(1 0 0);
+  --ring: oklch(0.418 0.062 202);
+
+  /* Shadow tint — cool near-black, low alpha. */
+  --shadow-tint-weak: oklch(0.22 0.02 235 / 0.06);
+  --shadow-tint-base: oklch(0.22 0.02 235 / 0.1);
+  --shadow-tint-strong: oklch(0.22 0.02 235 / 0.16);
+
+  /* Categorical palette — expense categories (dot legends, segmented bars).
+     Chosen to avoid the brand teal and the money green/red, so a category
+     swatch can never be misread as a balance state. */
+  --chart-1: oklch(0.75 0.155 70); /* food           — amber  */
+  --chart-2: oklch(0.575 0.15 252); /* transportation — blue   */
+  --chart-3: oklch(0.6 0.2 297); /* entertainment  — violet */
+  --chart-4: oklch(0.635 0.195 325); /* shopping       — magenta */
+  --chart-5: oklch(0.55 0.08 55); /* accommodation  — clay   */
+  --chart-6: oklch(0.685 0.1 232); /* utilities      — sky    */
+  --chart-7: oklch(0.532 0.019 225); /* other          — grey   */
+
+  --sidebar: oklch(1 0 0);
+  --sidebar-foreground: oklch(0.215 0.022 235);
+  --sidebar-primary: oklch(0.418 0.062 202);
+  --sidebar-primary-foreground: oklch(1 0 0);
+  --sidebar-accent: oklch(0.965 0.006 215);
+  --sidebar-accent-foreground: oklch(0.215 0.022 235);
+  --sidebar-border: oklch(0.925 0.008 220);
+  --sidebar-ring: oklch(0.418 0.062 202);
+}
+
+/*
+ * Dark: a near-neutral slate canvas (not inverted, not pure black). Elevation
+ * climbs by lightness — canvas 0.178 → surface 0.215 → card 0.243 → popover
+ * 0.265 — and every accent is re-picked, not reused: the brand teal jumps from
+ * L 0.42 to L 0.735 so it still pops, and takes dark text instead of white.
+ */
+.dark {
+  color-scheme: dark;
+
+  --background: oklch(0.178 0.019 240);
+  --foreground: oklch(0.965 0.005 230);
+  --surface: oklch(0.215 0.021 240);
+  --card: oklch(0.243 0.023 240);
+  --card-foreground: oklch(0.965 0.005 230);
+  --popover: oklch(0.265 0.025 240);
+  --popover-foreground: oklch(0.965 0.005 230);
+  --secondary: oklch(0.215 0.021 240);
+  --secondary-foreground: oklch(0.92 0.008 230);
+  --muted: oklch(0.215 0.021 240);
+  --muted-foreground: oklch(0.715 0.024 232);
+  --accent: oklch(0.28 0.04 205);
+  --accent-foreground: oklch(0.86 0.07 200);
+  --border: oklch(1 0 0 / 10%);
+  --border-strong: oklch(1 0 0 / 18%);
+  --input: oklch(1 0 0 / 14%);
+
+  --primary: oklch(0.735 0.095 204);
+  --primary-foreground: oklch(0.165 0.028 210);
+  --primary-soft: oklch(0.285 0.042 204);
+
+  --positive: oklch(0.8 0.175 152);
+  --positive-foreground: oklch(0.15 0.03 150);
+  --positive-soft: oklch(0.29 0.05 157);
+  --positive-strong: oklch(0.723 0.192 149.6);
+  --negative: oklch(0.715 0.16 22);
+  --negative-foreground: oklch(0.155 0.02 22);
+  --negative-soft: oklch(0.255 0.058 22);
+  --negative-strong: oklch(0.637 0.208 25.3);
+  --neutral: oklch(0.715 0.024 232);
+  --neutral-soft: oklch(0.27 0.018 235);
+
+  --destructive: oklch(0.715 0.16 22);
+  --destructive-foreground: oklch(0.155 0.02 22);
+  --ring: oklch(0.735 0.095 204);
+
+  /* Deeper, opaquer shadows — a 6% cool tint reads as nothing on dark. */
+  --shadow-tint-weak: oklch(0 0 0 / 0.3);
+  --shadow-tint-base: oklch(0 0 0 / 0.4);
+  --shadow-tint-strong: oklch(0 0 0 / 0.55);
+
+  /* Categories, brightened for a dark canvas. */
+  --chart-1: oklch(0.8 0.145 72);
+  --chart-2: oklch(0.68 0.13 252);
+  --chart-3: oklch(0.7 0.17 298);
+  --chart-4: oklch(0.72 0.16 325);
+  --chart-5: oklch(0.68 0.075 58);
+  --chart-6: oklch(0.775 0.09 232);
+  --chart-7: oklch(0.715 0.024 232);
+
+  --sidebar: oklch(0.243 0.023 240);
+  --sidebar-foreground: oklch(0.965 0.005 230);
+  --sidebar-primary: oklch(0.735 0.095 204);
+  --sidebar-primary-foreground: oklch(0.165 0.028 210);
+  --sidebar-accent: oklch(0.215 0.021 240);
+  --sidebar-accent-foreground: oklch(0.965 0.005 230);
+  --sidebar-border: oklch(1 0 0 / 10%);
+  --sidebar-ring: oklch(0.735 0.095 204);
+}
+
+@layer base {
+  * {
+    border-color: var(--color-border);
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+    font-family: var(--font-sans);
+    font-size: var(--text-body);
+    line-height: 1.55;
+    letter-spacing: -0.005em;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  /* One focus system for the whole app: a brand outline, always visible. */
+  :focus-visible {
+    outline: 2px solid var(--color-ring);
+    outline-offset: 2px;
+  }
+
+  ::selection {
+    background-color: var(--color-primary-soft);
+    color: var(--color-foreground);
+  }
+
+  /* Financial figures must stay column-aligned and unambiguous. */
+  .tabular-nums {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum" 1;
+  }
+
+  /* Titles are set tight — the fintech "big number" identity. */
+  h1,
+  h2,
+  h3,
+  h4 {
+    letter-spacing: -0.02em;
+    text-wrap: balance;
+  }
+}
+
+/* ── Surfaces ──────────────────────────────────────────────────────────────
+   `panel` is the single card treatment in the app: soft sheet, a shadow you
+   can actually see, generously rounded. Anything that genuinely floats
+   (dialog, popover, sheet) steps up to --shadow-md / --shadow-lg. */
+@utility panel {
+  background-color: var(--color-card);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-sm);
+}
+
+/* A recessed grouping for read-only detail inside a panel or dialog. */
+@utility panel-inset {
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+
+/* Row that highlights on hover — used by every list/table row that is a link
+   or has a primary action. Keeps hover feedback identical app-wide. */
+@utility row-hover {
+  transition: background-color 130ms ease;
+
+  &:hover {
+    background-color: var(--color-surface);
+  }
+}
+
+/* Section heading: the second level of the type scale. */
+@utility section-label {
+  font-size: var(--text-lead);
+  font-weight: 700;
+  letter-spacing: -0.014em;
+  color: var(--color-foreground);
+}
+
+/* Eyebrow: the small tracked-caps label that sits above a big money figure
+   (label → value hierarchy). Quiet, but never decorative. */
+@utility eyebrow {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  line-height: 1.2;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-muted-foreground);
+}
+
+/* Money figures — big, bold, tabular. Four sizes cover a settlement row's
+   inline amount up to a group dashboard's hero balance. Each sets its own
+   line-height: figures never wrap, so they want a tight box, and inheriting
+   the body's 1.55 would leave 20px of dead air around a 40px number. */
+@utility amount-sm {
+  font-size: 1.125rem; /* 18 */
+  line-height: 1.35;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+}
+
+@utility amount-md {
+  font-size: 1.375rem; /* 22 */
+  line-height: 1.25;
+  font-weight: 700;
+  letter-spacing: -0.018em;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+}
+
+@utility amount-lg {
+  font-size: 1.75rem; /* 28 */
+  line-height: 1.15;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+}
+
+@utility amount-xl {
+  font-size: 2.5rem; /* 40 */
+  line-height: 1.08;
+  font-weight: 800;
+  letter-spacing: -0.025em;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+}
+
+/* Small colored dot used next to a category name in legends and lists. Pair
+   with an inline background colour, e.g. style={{ background: "var(--chart-1)" }}. */
+@utility category-dot {
+  display: inline-block;
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 9999px;
+  flex-shrink: 0;
+}
