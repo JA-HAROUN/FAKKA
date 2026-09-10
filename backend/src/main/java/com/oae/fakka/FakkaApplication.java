@@ -8,8 +8,6 @@ public class FakkaApplication {
 
 	public static void main(String[] args) {
 		SpringApplication.run(FakkaApplication.class, args);
-
-		System.out.println("I AM ODYSSEUS V2");
 	}
 
 }
