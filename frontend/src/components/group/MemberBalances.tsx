@@ -27,11 +27,15 @@ export function MemberBalances({
             const balance = round2(balances[id] ?? 0);
             const isMe = currentUser?.id === id;
             return (
-              <li key={id} className="flex items-center gap-3 px-4 py-3">
-                <UserAvatar user={user} size="sm" />
-                <span className="min-w-0 flex-1 truncate text-sm font-medium">
+              <li key={id} className="flex items-center gap-3 px-4 py-3.5 sm:gap-4 sm:px-5">
+                <UserAvatar user={user} size="md" />
+                <span className="min-w-0 flex-1 truncate text-body font-semibold">
                   {user.name}
-                  {isMe && <span className="ml-1.5 text-xs text-muted-foreground">you</span>}
+                  {isMe && (
+                    <span className="ml-1.5 text-caption font-medium text-muted-foreground">
+                      you
+                    </span>
+                  )}
                 </span>
                 <BalanceIndicator
                   amount={balance}

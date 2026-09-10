@@ -67,7 +67,7 @@ export function SettleUpPanel({
           paid.length > 0 ? (
             <Panel className="flex items-center gap-3">
               <span
-                className="grid size-9 shrink-0 place-items-center rounded-lg bg-positive-soft text-positive"
+                className="grid size-9 shrink-0 place-items-center rounded-md bg-positive-soft text-positive"
                 aria-hidden
               >
                 <CheckCircle2 className="size-4" />
@@ -146,7 +146,7 @@ export function SettleUpPanel({
               {paid.map((settlement) => (
                 <li key={settlement.id} className="flex items-center gap-3 px-4 py-3">
                   <span
-                    className="grid size-8 shrink-0 place-items-center rounded-lg bg-positive-soft text-positive"
+                    className="grid size-8 shrink-0 place-items-center rounded-md bg-positive-soft text-positive"
                     aria-hidden
                   >
                     <CheckCircle2 className="size-4" />

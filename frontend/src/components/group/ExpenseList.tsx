@@ -48,7 +48,7 @@ export function ExpenseList({
         <Panel flush>
           {days.map((day) => (
             <div key={day.key} className="border-t border-border first:border-t-0">
-              <h3 className="border-b border-border bg-surface px-4 py-2 text-xs font-medium text-muted-foreground">
+              <h3 className="eyebrow border-b border-border bg-surface px-4 py-2.5 sm:px-5">
                 {day.heading}
               </h3>
               <PanelList>

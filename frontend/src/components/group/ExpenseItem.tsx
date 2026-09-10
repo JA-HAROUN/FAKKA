@@ -21,9 +21,9 @@ export function ExpenseItem({ expense }: { expense: Expense }) {
   const included = myShare > 0.005;
 
   return (
-    <li className="flex items-start gap-3 px-4 py-3">
+    <li className="flex items-start gap-3 px-4 py-3.5 sm:gap-4 sm:px-5">
       <span
-        className="mt-0.5 grid size-9 shrink-0 place-items-center rounded-lg border border-border bg-surface text-muted-foreground"
+        className="mt-0.5 grid size-9 shrink-0 place-items-center rounded-md border border-border bg-surface text-muted-foreground"
         aria-hidden
       >
         <Icon className="size-4" />
@@ -31,7 +31,7 @@ export function ExpenseItem({ expense }: { expense: Expense }) {
 
       <div className="min-w-0 flex-1">
         <div className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-1">
-          <p className="text-sm font-medium">{expense.description}</p>
+          <p className="text-body font-semibold">{expense.description}</p>
           {expense.source === "ai" && (
             <Badge variant="outline" title="Created from a plain-language description">
               <Sparkles aria-hidden /> AI
@@ -43,14 +43,16 @@ export function ExpenseItem({ expense }: { expense: Expense }) {
             </Badge>
           )}
         </div>
-        <p className="mt-0.5 truncate text-xs text-muted-foreground">
+        <p className="mt-0.5 truncate text-caption text-muted-foreground">
           {iPaid ? "You paid" : `${payer.name} paid`} · {category.label}
         </p>
       </div>
 
+      {/* The ledger's own figure, so it outranks the description beside it; the
+          reader's share stays a caption underneath. */}
       <div className="shrink-0 text-right">
-        <Money value={expense.totalAmount} size="sm" />
-        <p className="text-xs text-muted-foreground">
+        <Money value={expense.totalAmount} size="lg" />
+        <p className="text-caption text-muted-foreground">
           {included ? (
             <>
               your share <span className="tabular-nums">{formatNumber(myShare)}</span>
