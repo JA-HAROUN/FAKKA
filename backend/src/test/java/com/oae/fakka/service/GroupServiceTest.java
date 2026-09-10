@@ -1,6 +1,8 @@
 package com.oae.fakka.service;
 
+import com.oae.fakka.dto.BalanceStatus;
 import com.oae.fakka.dto.CreateGroupRequest;
+import com.oae.fakka.dto.GroupCardResponse;
 import com.oae.fakka.dto.GroupResponse;
 import com.oae.fakka.dto.UserSummaryResponse;
 import com.oae.fakka.entity.Group;
@@ -36,6 +38,7 @@ import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 
@@ -65,11 +68,17 @@ class GroupServiceTest {
     @Mock
     private GroupMemberRepository groupMemberRepository;
 
+    @Mock
+    private BalanceService balanceService;
+
     @Captor
     private ArgumentCaptor<List<GroupMember>> membersCaptor;
 
     @Captor
     private ArgumentCaptor<Collection<Long>> candidateIdsCaptor;
+
+    @Captor
+    private ArgumentCaptor<Collection<Long>> groupIdsCaptor;
 
     @InjectMocks
     private GroupService groupService;
@@ -220,6 +229,114 @@ class GroupServiceTest {
         verify(groupMemberRepository, never()).findMembersOf(anyLong());
     }
 
+    @Test
+    void listGroupsForUserReturnsOneCardPerGroupWithItsMemberCount() {
+        given(userRepository.existsById(1L)).willReturn(true);
+        given(groupRepository.findGroupsOf(1L)).willReturn(List.of(group(10L, "Dinner"), group(11L, "Trip")));
+        given(groupMemberRepository.countMembersOf(anyCollection()))
+                .willReturn(List.of(new Count(10L, 3), new Count(11L, 1)));
+
+        List<GroupCardResponse> cards = groupService.listGroupsForUser(1L);
+
+        assertThat(cards)
+                .extracting(GroupCardResponse::groupId, GroupCardResponse::name,
+                        GroupCardResponse::memberCount)
+                .containsExactly(tuple(10L, "Dinner", 3), tuple(11L, "Trip", 1));
+    }
+
+    /**
+     * The contract that has to hold before the balance engine exists: whatever it eventually
+     * returns, the sign decides the badge. Mocking it is the only way to prove that today, while
+     * the real implementation still answers 0.
+     */
+    @Test
+    void listGroupsForUserDerivesStatusFromWhateverTheBalanceEngineReturns() {
+        given(userRepository.existsById(1L)).willReturn(true);
+        given(groupRepository.findGroupsOf(1L)).willReturn(List.of(
+                group(10L, "Owed"), group(11L, "Owing"), group(12L, "Even")));
+        given(groupMemberRepository.countMembersOf(anyCollection()))
+                .willReturn(List.of(new Count(10L, 2), new Count(11L, 2), new Count(12L, 2)));
+        given(balanceService.calculateUserBalanceInGroup(1L, 10L)).willReturn(35_000L);
+        given(balanceService.calculateUserBalanceInGroup(1L, 11L)).willReturn(-12_550L);
+        given(balanceService.calculateUserBalanceInGroup(1L, 12L)).willReturn(0L);
+
+        List<GroupCardResponse> cards = groupService.listGroupsForUser(1L);
+
+        assertThat(cards)
+                .extracting(GroupCardResponse::userBalance, GroupCardResponse::status)
+                .containsExactly(
+                        tuple(35_000L, BalanceStatus.POSITIVE),
+                        tuple(-12_550L, BalanceStatus.NEGATIVE),
+                        tuple(0L, BalanceStatus.SETTLED));
+    }
+
+    /** Today every card is SETTLED, and a client reading the endpoint should see exactly that. */
+    @Test
+    void listGroupsForUserReportsSettledWhileTheEngineIsStubbed() {
+        given(userRepository.existsById(1L)).willReturn(true);
+        given(groupRepository.findGroupsOf(1L)).willReturn(List.of(group(10L, "Dinner")));
+        given(groupMemberRepository.countMembersOf(anyCollection()))
+                .willReturn(List.of(new Count(10L, 2)));
+        given(balanceService.calculateUserBalanceInGroup(1L, 10L)).willReturn(0L);
+
+        assertThat(groupService.listGroupsForUser(1L))
+                .singleElement()
+                .satisfies(card -> {
+                    assertThat(card.userBalance()).isZero();
+                    assertThat(card.status()).isEqualTo(BalanceStatus.SETTLED);
+                });
+    }
+
+    /** The query orders newest first; the service must present that order untouched. */
+    @Test
+    void listGroupsForUserKeepsRepositoryOrder() {
+        given(userRepository.existsById(1L)).willReturn(true);
+        given(groupRepository.findGroupsOf(1L)).willReturn(List.of(
+                group(12L, "Newest"), group(11L, "Middle"), group(10L, "Oldest")));
+        given(groupMemberRepository.countMembersOf(anyCollection()))
+                .willReturn(List.of(new Count(10L, 2), new Count(11L, 2), new Count(12L, 2)));
+
+        assertThat(groupService.listGroupsForUser(1L))
+                .extracting(GroupCardResponse::name)
+                .containsExactly("Newest", "Middle", "Oldest");
+    }
+
+    /** One grouped count for the whole dashboard, not one per card. */
+    @Test
+    void listGroupsForUserCountsMembersForEveryGroupInOneQuery() {
+        given(userRepository.existsById(1L)).willReturn(true);
+        given(groupRepository.findGroupsOf(1L)).willReturn(List.of(group(10L, "Dinner"), group(11L, "Trip")));
+        given(groupMemberRepository.countMembersOf(anyCollection()))
+                .willReturn(List.of(new Count(10L, 3), new Count(11L, 1)));
+
+        groupService.listGroupsForUser(1L);
+
+        verify(groupMemberRepository, times(1)).countMembersOf(groupIdsCaptor.capture());
+        assertThat(groupIdsCaptor.getValue()).containsExactly(10L, 11L);
+    }
+
+    @Test
+    void listGroupsForUserSkipsTheCountQueryWhenThereAreNoGroups() {
+        given(userRepository.existsById(1L)).willReturn(true);
+        given(groupRepository.findGroupsOf(1L)).willReturn(List.of());
+
+        assertThat(groupService.listGroupsForUser(1L)).isEmpty();
+
+        verify(groupMemberRepository, never()).countMembersOf(anyCollection());
+        verifyNoInteractions(balanceService);
+    }
+
+    @Test
+    void listGroupsForUserReports404ForAnUnknownUser() {
+        given(userRepository.existsById(99L)).willReturn(false);
+
+        assertThatThrownBy(() -> groupService.listGroupsForUser(99L))
+                .isInstanceOf(ResourceNotFoundException.class)
+                .hasMessage("User 99 was not found");
+
+        verifyNoInteractions(groupRepository, groupMemberRepository, balanceService);
+    }
+
     private void givenCreatorExists() {
         given(userRepository.findById(1L)).willReturn(Optional.of(CREATOR));
     }
@@ -235,6 +352,25 @@ class GroupServiceTest {
             group.setId(id);
             return group;
         });
+    }
+
+    private static Group group(Long id, String name) {
+        return Group.builder().id(id).name(name).createdBy(1L).build();
+    }
+
+    /** Stands in for the repository projection, which is an interface with no value type. */
+    private record Count(Long groupId, long memberCount)
+            implements GroupMemberRepository.MemberCount {
+
+        @Override
+        public Long getGroupId() {
+            return groupId;
+        }
+
+        @Override
+        public long getMemberCount() {
+            return memberCount;
+        }
     }
 
     private static User user(Long id, String name, String profileImageUrl) {

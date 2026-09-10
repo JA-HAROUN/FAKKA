@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.util.Collection;
 import java.util.List;
 
 public interface GroupMemberRepository extends JpaRepository<GroupMember, Long> {
@@ -24,4 +25,27 @@ public interface GroupMemberRepository extends JpaRepository<GroupMember, Long> 
             order by u.name asc, u.id asc
             """)
     List<User> findMembersOf(@Param("groupId") Long groupId);
+
+    /**
+     * How many members each of {@code groupIds} has, for the dashboard cards (FR-4).
+     * <p>
+     * One grouped query for the whole dashboard instead of a count per card: a user with twenty
+     * groups would otherwise cost twenty round trips to render one screen. Callers must not pass
+     * an empty collection -- there is nothing to count, and an empty IN list is not portable SQL.
+     */
+    @Query("""
+            select m.groupId as groupId, count(m.id) as memberCount
+            from GroupMember m
+            where m.groupId in :groupIds
+            group by m.groupId
+            """)
+    List<MemberCount> countMembersOf(@Param("groupIds") Collection<Long> groupIds);
+
+    /** Projection for {@link #countMembersOf}; the aliases in that query bind to these getters. */
+    interface MemberCount {
+
+        Long getGroupId();
+
+        long getMemberCount();
+    }
 }

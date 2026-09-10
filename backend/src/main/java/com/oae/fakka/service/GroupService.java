@@ -1,6 +1,7 @@
 package com.oae.fakka.service;
 
 import com.oae.fakka.dto.CreateGroupRequest;
+import com.oae.fakka.dto.GroupCardResponse;
 import com.oae.fakka.dto.GroupResponse;
 import com.oae.fakka.dto.UserSummaryResponse;
 import com.oae.fakka.entity.Group;
@@ -19,11 +20,14 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.SequencedSet;
+import java.util.stream.Collectors;
 
 /**
- * Group creation and membership (FR-6, FR-7, FR-11).
+ * Group creation, membership, and the group cards on the personal dashboard
+ * (FR-4 to FR-7, FR-11).
  */
 @Slf4j
 @Service
@@ -33,16 +37,19 @@ public class GroupService {
     private final FriendshipRepository friendshipRepository;
     private final GroupRepository groupRepository;
     private final GroupMemberRepository groupMemberRepository;
+    private final BalanceService balanceService;
 
     public GroupService(
             UserRepository userRepository,
             FriendshipRepository friendshipRepository,
             GroupRepository groupRepository,
-            GroupMemberRepository groupMemberRepository) {
+            GroupMemberRepository groupMemberRepository,
+            BalanceService balanceService) {
         this.userRepository = userRepository;
         this.friendshipRepository = friendshipRepository;
         this.groupRepository = groupRepository;
         this.groupMemberRepository = groupMemberRepository;
+        this.balanceService = balanceService;
     }
 
     /**
@@ -90,6 +97,55 @@ public class GroupService {
 
         return groupMemberRepository.findMembersOf(groupId).stream()
                 .map(UserSummaryResponse::from)
+                .toList();
+    }
+
+    /**
+     * The dashboard: every group the user belongs to, with its size and their standing in it
+     * (FR-4, FR-5).
+     * <p>
+     * <strong>Balances are 0 until the engine exists</strong>, so every card comes back
+     * {@code SETTLED} today. See {@link BalanceService#calculateUserBalanceInGroup} for what
+     * Phase 5 has to fill in; nothing else here changes when it does.
+     */
+    @Transactional(readOnly = true)
+    public List<GroupCardResponse> listGroupsForUser(Long userId) {
+        /*
+         * An unknown user is a 404 rather than an empty dashboard, for the same reason as the
+         * friend list: a client that cannot tell "no groups yet" from "no such user" renders the
+         * empty state for what is really a bad id.
+         */
+        if (!userRepository.existsById(userId)) {
+            throw new ResourceNotFoundException("User", userId);
+        }
+
+        List<Group> groups = groupRepository.findGroupsOf(userId);
+        if (groups.isEmpty()) {
+            // Nothing to count, and the count query must not be handed an empty IN list.
+            return List.of();
+        }
+
+        Map<Long, Long> memberCounts = groupMemberRepository
+                .countMembersOf(groups.stream().map(Group::getId).toList()).stream()
+                .collect(Collectors.toMap(
+                        GroupMemberRepository.MemberCount::getGroupId,
+                        GroupMemberRepository.MemberCount::getMemberCount));
+
+        /*
+         * The balance call is per group, which is fine only because it is a stub that touches
+         * nothing. TODO(Phase 5): once it reads expenses, replace this with one grouped query
+         * for the whole dashboard, or a twenty-group dashboard becomes twenty scans.
+         */
+        return groups.stream()
+                .map(group -> GroupCardResponse.of(
+                        group,
+                        /*
+                         * The user is a member of every group listed here, so a count is always
+                         * present. Defaulting rather than unboxing null keeps a dashboard
+                         * rendering if that ever stops being true.
+                         */
+                        Math.toIntExact(memberCounts.getOrDefault(group.getId(), 0L)),
+                        balanceService.calculateUserBalanceInGroup(userId, group.getId())))
                 .toList();
     }
 
