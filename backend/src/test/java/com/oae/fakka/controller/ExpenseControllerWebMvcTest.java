@@ -11,6 +11,7 @@ import com.oae.fakka.exception.SplitParticipantMismatchException;
 import com.oae.fakka.exception.SplitTotalMismatchException;
 import com.oae.fakka.service.ExpenseService;
 import com.oae.fakka.service.NaturalLanguageExpenseService;
+import com.oae.fakka.service.ReceiptOcrService;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -60,12 +61,15 @@ class ExpenseControllerWebMvcTest {
     private ExpenseService expenseService;
 
     /**
-     * Only required so the context loads: {@link ExpenseController} takes both services as
+     * Only required so the context loads: {@link ExpenseController} takes three services as
      * constructor dependencies. The natural-language endpoint has its own web-layer test,
      * {@code ExpenseControllerParseNlWebMvcTest}.
      */
     @MockitoBean
     private NaturalLanguageExpenseService naturalLanguageExpenseService;
+
+    @MockitoBean
+    private ReceiptOcrService receiptOcrService;
 
     @Test
     void createExpenseReturns201WithTheShares() throws Exception {

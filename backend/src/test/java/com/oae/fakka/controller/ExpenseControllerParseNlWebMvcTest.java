@@ -9,6 +9,7 @@ import com.oae.fakka.exception.AiUnavailableException;
 import com.oae.fakka.exception.ResourceNotFoundException;
 import com.oae.fakka.service.ExpenseService;
 import com.oae.fakka.service.NaturalLanguageExpenseService;
+import com.oae.fakka.service.ReceiptOcrService;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -64,6 +65,14 @@ class ExpenseControllerParseNlWebMvcTest {
 
     @MockitoBean
     private NaturalLanguageExpenseService naturalLanguageExpenseService;
+
+    /**
+     * Only required so the context loads: {@link ExpenseController} takes three services as
+     * constructor dependencies. The OCR endpoint has its own web-layer test,
+     * {@code ExpenseControllerParseReceiptWebMvcTest}.
+     */
+    @MockitoBean
+    private ReceiptOcrService receiptOcrService;
 
     @Test
     void parsesTheTextAndReturnsTheDraftAs200() throws Exception {
