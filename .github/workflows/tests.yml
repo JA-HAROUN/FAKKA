@@ -1,0 +1,59 @@
+# Runs the backend test suite for main: on every push to it, and on every pull request
+# targeting it, so a branch is proven green before it can land.
+#
+# No database service is declared on purpose. Every test activates the "dev" profile, which
+# points at in-memory H2, so the suite needs nothing but a JDK. If a test ever needs the real
+# MySQL settings from application.properties, it will need DB_URL/DB_USERNAME/DB_PASSWORD as
+# secrets here rather than the defaults, which are deliberately unset.
+name: Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+# A new push to the same ref makes the previous run pointless, so stop paying for it.
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    working-directory: backend
+
+jobs:
+  test:
+    name: Maven tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v4
+
+      # 21 matches java.version in the pom. The local toolchain may be newer, and pinning the
+      # release CI compiles against is the point of having CI at all.
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      # --no-transfer-progress keeps the dependency-download noise out of the log. Switch this to
+      # "verify" if you also want CI to package the jar; that pulls in the jar and repackage
+      # plugins, so it is a slightly bigger first-run download.
+      - name: Run tests
+        run: ./mvnw -B --no-transfer-progress test
+
+      # Uploaded even on failure -- that is exactly when the reports are worth reading. The path
+      # is repo-relative: the default working-directory above applies to run steps only.
+      - name: Upload test reports
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: surefire-reports
+          path: backend/target/surefire-reports/
+          if-no-files-found: warn
+          retention-days: 7
