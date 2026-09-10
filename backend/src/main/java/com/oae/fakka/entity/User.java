@@ -16,6 +16,7 @@ import lombok.ToString;
 import org.hibernate.annotations.CreationTimestamp;
 
 import java.time.Instant;
+import java.util.Locale;
 
 /**
  * A registered account.
@@ -55,4 +56,16 @@ public class User {
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
+
+    /**
+     * The canonical form of an email for storage and lookup.
+     * <p>
+     * Emails are case-insensitive in practice, so one canonical form is stored. This lives on
+     * the entity, next to the column it protects, because every writer and every lookup has to
+     * agree on it: normalise in one place and the unique index stays meaningful, normalise in
+     * two and "A@x.com" eventually becomes a second account.
+     */
+    public static String normaliseEmail(String email) {
+        return email.trim().toLowerCase(Locale.ROOT);
+    }
 }

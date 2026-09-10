@@ -15,7 +15,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.security.SecureRandom;
 import java.util.Base64;
-import java.util.Locale;
 import java.util.Optional;
 
 @Slf4j
@@ -44,7 +43,7 @@ public class AuthService {
 
     @Transactional
     public UserResponse signUp(SignUpRequest request) {
-        String email = normaliseEmail(request.email());
+        String email = User.normaliseEmail(request.email());
 
         // Fast path so the common case returns a clear 409 rather than a constraint error.
         if (userRepository.existsByEmail(email)) {
@@ -74,7 +73,7 @@ public class AuthService {
 
     @Transactional(readOnly = true)
     public UserResponse signIn(SignInRequest request) {
-        Optional<User> user = userRepository.findByEmail(normaliseEmail(request.email()));
+        Optional<User> user = userRepository.findByEmail(User.normaliseEmail(request.email()));
 
         if (user.isEmpty()) {
             passwordEncoder.matches(request.password(), timingEqualisationHash);
@@ -89,15 +88,6 @@ public class AuthService {
         }
 
         return UserResponse.from(user.get());
-    }
-
-    /**
-     * Emails are case-insensitive in practice, so store one canonical form. Doing this in
-     * one place keeps the DB unique index meaningful — otherwise "A@x.com" and "a@x.com"
-     * would be two accounts.
-     */
-    private static String normaliseEmail(String email) {
-        return email.trim().toLowerCase(Locale.ROOT);
     }
 
     private static String blankToNull(String value) {
