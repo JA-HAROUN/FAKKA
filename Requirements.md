@@ -1,755 +1,272 @@
 # Functional Requirements Document
-
 ## Group Expense Management Application
-
-### 1. Product Overview
-
-The application is a group expense management platform that allows users to create groups with friends, record shared expenses, automatically calculate debts and credits, and determine who owes whom.
-
-The application provides two AI-assisted methods for faster expense entry:
-
-* **Natural-language expense entry** using an LLM.
-* **Receipt image processing** using OCR to automatically extract purchased items.
-
-Both AI-assisted features are optional. **Every AI-assisted operation must have a manual alternative**, ensuring that users can complete the entire expense-management workflow without relying on external AI services.
 
 ---
 
-# 2. User Flow
+## 1. Product Overview
 
-The primary application flow is:
+A group expense management platform enabling users to:
+- Create groups with friends
+- Record shared expenses
+- Automatically calculate debts/credits
+- Determine who owes whom
 
-```text
+**AI-Assisted Entry Methods (Optional):**
+- Natural-language expense entry (LLM)
+- Receipt image processing (OCR)
+
+> **Critical Rule:** Every AI operation must have a manual alternative. Users must complete the full workflow without external AI services.
+
+---
+
+## 2. User Flow
+
+```
 Sign Up / Sign In
        ↓
 Personal Dashboard
        ↓
-┌─────────────────────────────┐
-│ Groups / Rooms              │
-│                             │
-│ Group Cards                 │
-│ + Financial Status          │
-└──────────────┬──────────────┘
-               ↓
-        Select a Group
-               ↓
-        Group Dashboard
-               ↓
-        Add an Expense
-               ↓
-     ┌─────────┼──────────┐
-     ↓         ↓          ↓
-  Manual     Natural    Receipt
-  Entry      Language    OCR
-     │         │          │
-     └─────────┼──────────┘
-               ↓
-       Review Expense
-               ↓
-       Save Expense
-               ↓
-    Automatic Calculation
-               ↓
-      Group Balances
-               ↓
-       Who Owes Whom
-               ↓
-        Export Report
+Groups/Rooms (Group Cards + Financial Status)
+       ↓
+Select a Group → Group Dashboard → Add Expense
+       ↓
+┌──────────┬──────────────┬─────────────┐
+│  Manual  │  Natural     │  Receipt    │
+│  Entry   │  Language    │  OCR        │
+└──────────┴──────────────┴─────────────┘
+       ↓
+Review Expense → Save → Automatic Calculation
+       ↓
+Group Balances → Who Owes Whom → Export Report
 ```
 
 ---
 
-# 3. Authentication
+## 3. Authentication
 
-## FR-1 — Sign Up
-
-The system shall allow a new user to create an account.
-NO TOKEN AUTH IS NEEDED
-Required information:
-
-* Name
-* Email
-* Password
-
-The system shall validate the provided information and prevent registration using an already registered email.
-
-## FR-2 — Sign In
-
-The system shall allow an existing user to sign in using:
-
-* Email
-* Password
-
-Upon successful authentication, the user shall be redirected to the main dashboard.
-
-## FR-3 — User Profile
-
-The system shall maintain a basic user profile containing:
-
-* User ID
-* Name
-* Email
-* Profile image, if provided
+| ID | Requirement |
+|----|-------------|
+| FR-1 | **Sign Up:** Create account with Name, Email, Password. Validate info; prevent duplicate emails. **No token auth needed.** |
+| FR-2 | **Sign In:** Email + Password. Redirect to dashboard on success. |
+| FR-3 | **User Profile:** User ID, Name, Email, Profile image (optional). |
 
 ---
 
-# 4. Main Dashboard
+## 4. Main Dashboard
 
-## FR-4 — Group/Room List
+| ID | Requirement |
+|----|-------------|
+| FR-4 | **Group/Room List:** Display all user's groups as cards. Each card shows: Group name, image, member count, user's financial balance. |
+| FR-5 | **Group Financial Status:** Visual indicator — 🟢 Positive (+EGP, owed), 🔴 Negative (−EGP, owes), ⚪ Zero (settled). |
 
-After signing in, the user shall see all groups they belong to.
-
-Groups shall be displayed as cards.
-
-Each group card shall contain at minimum:
-
-* Group name
-* Group image
-* Number of members
-* User's financial balance within the group
-
-Example:
-
-```text
+**Example Card:**
+```
 ┌───────────────────────────┐
 │        🍕 Dinner          │
-│                           │
 │  5 members                │
-│                           │
-│  You are owed             │
-│  + 350 EGP                │
+│  You are owed +350 EGP    │
 └───────────────────────────┘
 ```
 
-## FR-5 — Group Financial Status
+---
 
-The group card shall provide a visual indication of the user's current financial status.
+## 5. Group Creation
 
-### Positive balance
-
-Indicates that other members owe the user money.
-
-**Example:**
-
-> 🟢 +350 EGP — You are owed
-
-### Negative balance
-
-Indicates that the user owes other members money.
-
-**Example:**
-
-> 🔴 −250 EGP — You owe
-
-### Zero balance
-
-Indicates that the user has no outstanding balance.
-
-**Example:**
-
-> ⚪ 0 EGP — Settled
+| ID | Requirement |
+|----|-------------|
+| FR-6 | **Create Group:** Form with Group name, image, members/friends. Creation date auto-generated. |
+| FR-7 | **Add Members:** Creator selects friends. Creator automatically becomes a member. |
 
 ---
 
-# 5. Group Creation
+## 6. Friends
 
-## FR-6 — Create Group
-
-The user shall be able to create a new group.
-
-The group creation form shall contain:
-
-* Group name
-* Group image
-* Members/friends
-* Creation date
-
-The creation date shall be automatically generated by the system.
-
-## FR-7 — Add Members
-
-The group creator shall be able to select friends to add to the group.
-
-The group creator shall automatically become a member of the group.
+| ID | Requirement |
+|----|-------------|
+| FR-8 | **Friends Tab:** Dedicated section to view existing friends. |
+| FR-9 | **Add Friend:** Add registered users via email or username search. |
+| FR-10 | **Friend List:** Display Name + Profile image. Friends selectable when creating groups. |
 
 ---
 
-# 6. Friends
+## 7. Group Dashboard
 
-## FR-8 — Friends Tab
-
-The application shall provide a dedicated Friends section.
-
-The user shall be able to view their existing friends.
-
-## FR-9 — Add Friend
-
-The user shall be able to add another registered user as a friend.
-
-The application may use email or username search for finding users.
-
-## FR-10 — Friend List
-
-The friend list shall display basic information such as:
-
-* Name
-* Profile image, if available
-
-Friends shall be selectable when creating groups.
+| ID | Requirement |
+|----|-------------|
+| FR-11 | **View Group:** Shows group name, image, members, total expenses, individual balances, expense list, add-expense option, settlement info, export option. |
 
 ---
 
-# 7. Group Dashboard
+## 8. Expense Creation
 
-## FR-11 — View Group
-
-Selecting a group shall open its group dashboard.
-
-The group dashboard shall display:
-
-* Group name
-* Group image
-* Members
-* Total group expenses
-* Individual member balances
-* List of expenses
-* Option to add an expense
-* Settlement information
-* Option to export a report
+| ID | Requirement |
+|----|-------------|
+| FR-12 | **Add Expense:** Fields — Category, Description, Optional image, Total amount, Payer, Participants, Split method. |
+| FR-13 | **Category:** Predefined list — Food, Transportation, Entertainment, Shopping, Accommodation, Utilities, Other. |
+| FR-14 | **Description:** Text input (e.g., "Dinner at Pizza Hut"). |
+| FR-15 | **Image:** Optional attachment (receipt, photo, supporting image). |
 
 ---
 
-# 8. Expense Creation
+## 9. Expense Splitting
 
-## FR-12 — Add Expense
-
-A group member shall be able to create an expense within a group.
-
-An expense shall contain:
-
-* Category
-* Description
-* Optional image
-* Total amount
-* Person who paid
-* People responsible for the expense
-* Split method
-
-## FR-13 — Expense Category
-
-The user shall select a category for each expense.
-
-Possible categories include:
-
-* Food
-* Transportation
-* Entertainment
-* Shopping
-* Accommodation
-* Utilities
-* Other
-
-The category list should be predefined for the MVP.
-
-## FR-14 — Expense Description
-
-The user shall be able to enter a textual description of the expense.
-
-Example:
-
-> Dinner at Pizza Hut
-
-## FR-15 — Expense Image
-
-The user may optionally attach an image to an expense.
-
-The image could be:
-
-* Receipt
-* Photo
-* Other supporting image
+| ID | Requirement |
+|----|-------------|
+| FR-16 | **Select Payer:** Exactly one member designated as payer. |
+| FR-17 | **Select Participants:** Multiple members selectable. |
+| FR-18 | **Equal Split:** System auto-calculates equal shares (e.g., 900 EGP ÷ 3 = 300 each). |
+| FR-19 | **Unequal/Custom Split:** User specifies each amount. Validate: Sum of shares = Total. Reject save if mismatch. |
 
 ---
 
-# 9. Expense Splitting
+## 10. Natural-Language Expense Entry
 
-## FR-16 — Select Payer
+| ID | Requirement |
+|----|-------------|
+| FR-20 | **Natural-Language Input:** Optional AI method. Example: "John paid 900 EGP for dinner. John and Ahmed shared pizza, Mohamed had burger." |
+| FR-21 | **LLM Processing:** Send description to external LLM → returns structured JSON (description, totalAmount, paidBy, participants, splitType). |
+| FR-22 | **AI Result Review:** Never auto-saved. Populate standard form. User can Review, Modify, Confirm, or Cancel. |
+| FR-23 | **Manual Fallback:** Manual form always available. If LLM unavailable/limited/fails/incomplete → user enters manually. **AI accelerates existing workflow; does not create separate workflow.** |
 
-The user shall select the group member who paid for the expense.
-
-Example:
-
-```text
-Who paid?
-
-☑ John
-☐ Ahmed
-☐ Mohamed
-```
-
-Only one member shall be designated as the payer for a single expense.
-
-## FR-17 — Select Participants
-
-The user shall select which group members are responsible for the expense.
-
-Multiple members may be selected.
-
-Example:
-
-```text
-Who was this expense for?
-
-☑ John
-☑ Ahmed
-☑ Mohamed
-☐ Michael
-```
-
-## FR-18 — Equal Split
-
-The system shall support equal splitting.
-
-Example:
-
-```text
-Total: 900 EGP
-
-John       300 EGP
-Ahmed      300 EGP
-Mohamed    300 EGP
-```
-
-The system shall automatically calculate each participant's share.
-
-## FR-19 — Unequal/Custom Split
-
-The system shall support custom splitting.
-
-The user shall specify the amount owed by each participant.
-
-Example:
-
-```text
-Total: 900 EGP
-
-John       400 EGP
-Ahmed      300 EGP
-Mohamed    200 EGP
-```
-
-The system shall validate that:
-
-> Sum of individual shares = Total expense
-
-The expense shall not be saved if the amounts do not match.
-
----
-
-# 10. Natural-Language Expense Entry
-
-## FR-20 — Natural-Language Input
-
-The user shall have an optional AI-assisted method for entering expenses using natural language.
-
-Example:
-
-> "John paid 900 EGP for dinner. John and Ahmed shared the pizza and Mohamed had the burger."
-
-## FR-21 — LLM Processing
-
-The system shall send the user's description to an external LLM.
-
-The LLM shall return structured JSON representing the expense.
-
-The JSON shall contain the information necessary to populate the standard expense form.
-
-Example:
-
+**Example JSON:**
 ```json
 {
   "description": "Dinner",
   "totalAmount": 900,
   "paidBy": "John",
-  "participants": [
-    "John",
-    "Ahmed",
-    "Mohamed"
-  ],
+  "participants": ["John", "Ahmed", "Mohamed"],
   "splitType": "equal"
 }
 ```
 
-## FR-22 — AI Result Review
+---
 
-The LLM result shall **not be saved automatically**.
+## 11. Receipt OCR
 
-The system shall populate the standard expense interface using the LLM result.
-
-The user shall be able to:
-
-* Review
-* Modify
-* Confirm
-* Cancel
-
-the generated information.
-
-## FR-23 — Manual Fallback
-
-The standard manual expense form shall always remain available.
-
-If the LLM is:
-
-* unavailable
-* unavailable due to API limits
-* unable to understand the input
-* returns invalid/incomplete information
-
-the user shall be able to manually enter the expense.
-
-**AI accelerates the existing workflow; it does not create a separate workflow.**
+| ID | Requirement |
+|----|-------------|
+| FR-24 | **Receipt Upload:** Optional upload/photograph of receipt. |
+| FR-25 | **OCR Processing:** Send image to external OCR → extract text (item names, quantities, prices, total). |
+| FR-26 | **Automatic Item Entry:** Populate purchased-items interface. User reviews/edits before saving. |
+| FR-27 | **Manual Item Entry:** Always available. Example: Pizza ×1 = 350 EGP; Burger ×1 = 200 EGP; Coke ×2 = 100 EGP. |
+| FR-28 | **OCR Failure Fallback:** Continue with manual item entry. |
 
 ---
 
-# 11. Receipt OCR
+## 12. Purchased Items
 
-## FR-24 — Receipt Upload
+| ID | Requirement |
+|----|-------------|
+| FR-29 | **Item Management:** Each item supports — Name, Quantity, Unit/total price, Participants responsible. |
+| FR-30 | **Item Assignment:** Assign items to one or more members. **Can be implemented after core splitting if time limited.** |
 
-The user shall have an optional ability to upload or photograph a receipt.
-
-## FR-25 — OCR Processing
-
-The system shall send the receipt image to an external OCR service.
-
-The OCR service shall extract textual information from the receipt.
-
-Example:
-
-```text
-Pizza        350 EGP
-Burger       200 EGP
-Coke          50 EGP
-Fries         80 EGP
---------------------
-Total        680 EGP
+**Example:**
 ```
-
-## FR-26 — Automatic Item Entry
-
-The system shall use the OCR result to populate the purchased-items interface.
-
-The extracted information may include:
-
-* Item name
-* Quantity
-* Price
-* Total
-
-The user shall be able to review and edit the extracted information before saving.
-
-## FR-27 — Manual Item Entry
-
-Users shall always be able to enter purchased items manually.
-
-Example:
-
-```text
-Item        Quantity     Price
-
-Pizza          1         350 EGP
-Burger         1         200 EGP
-Coke           2         100 EGP
-```
-
-## FR-28 — OCR Failure Fallback
-
-If OCR fails or produces unusable information, the user shall be able to continue by manually entering the purchased items.
-
----
-
-# 12. Purchased Items
-
-## FR-29 — Item Management
-
-An expense may contain individual purchased items.
-
-Each item shall support:
-
-* Item name
-* Quantity
-* Unit/total price
-* Participants responsible for the item
-
-## FR-30 — Item Assignment
-
-Users shall be able to assign purchased items to one or more group members.
-
-Example:
-
-```text
-Pizza — 400 EGP
-☑ John
-☑ Ahmed
-
-Burger — 250 EGP
-☑ Mohamed
-```
-
-**This can be implemented after the core expense splitting functionality if time is limited.**
-
----
-
-# 13. Automatic Balance Calculation
-
-## FR-31 — Calculate Individual Balance
-
-The system shall automatically calculate each user's balance within a group.
-
-The calculation shall consider:
-
-* Amount paid by the user
-* Amount owed by the user
-* All confirmed expenses within the group
-* Confirmed settlements, if applicable
-
-The fundamental calculation is:
-
-> **Balance = Total Paid − Total Owed**
-
-Example:
-
-```text
-John
-
-Paid:       1,000 EGP
-Owed:         700 EGP
-
-Balance:     +300 EGP
+Pizza — 400 EGP    ☑ John  ☑ Ahmed
+Burger — 250 EGP   ☑ Mohamed
 ```
 
 ---
 
-# 14. Who Owes Whom
+## 13. Automatic Balance Calculation
 
-## FR-32 — Generate Debts
+| ID | Requirement |
+|----|-------------|
+| FR-31 | **Calculate Individual Balance:** Considers amount paid, amount owed, all confirmed expenses, confirmed settlements. **Formula: Balance = Total Paid − Total Owed.** |
 
-The system shall calculate the outstanding debts between group members.
+**Example:** John — Paid: 1,000 EGP, Owed: 700 EGP → Balance: +300 EGP
 
-Example:
+---
 
-```text
-Ahmed owes John
-200 EGP
+## 14. Who Owes Whom
 
-Mohamed owes John
-150 EGP
+| ID | Requirement |
+|----|-------------|
+| FR-32 | **Generate Debts:** Calculate outstanding debts (e.g., Ahmed owes John 200 EGP; Mohamed owes John 150 EGP). |
+| FR-33 | **Simplify Debts:** Minimize transactions. Show recommended settlement transactions. |
+
+**Example Settlement:**
 ```
-
-## FR-33 — Simplify Debts
-
-The system shall simplify the group's outstanding balances to minimize unnecessary transactions.
-
-The final result shall show the recommended transactions required to settle the group.
-
-Example:
-
-```text
-💸 Settlement
-
-Ahmed → John
-200 EGP
-
-Mohamed → John
-150 EGP
+💸 Ahmed → John: 200 EGP
+💸 Mohamed → John: 150 EGP
 ```
 
 ---
 
-# 15. Settlement Status
+## 15. Settlement Status
 
-## FR-34 — Settlement Status
-
-Each generated settlement shall have a status.
-
-Minimum statuses:
-
-* Pending
-* Paid
-
-## FR-35 — Mark Settlement as Paid
-
-A relevant user shall be able to mark a settlement as paid.
-
-Example:
-
-```text
-Ahmed → John
-200 EGP
-
-Status: Pending
-
-[ Mark as Paid ]
-```
-
-After confirmation:
-
-```text
-✓ Paid
-```
-
-The application shall update the outstanding balance accordingly.
+| ID | Requirement |
+|----|-------------|
+| FR-34 | **Statuses:** Minimum — Pending, Paid. |
+| FR-35 | **Mark as Paid:** Relevant user marks settlement paid. Balance updates accordingly. |
 
 ---
 
-# 16. Group Expense Report
+## 16. Group Expense Report
 
-## FR-36 — Export Group Report
-
-The user shall be able to export a report containing the group's financial information.
-
-The report shall contain:
-
-* Group name
-* Group members
-* Outings/expenses
-* Expense dates
-* Categories
-* Payers
-* Individual shares
-* Total expenses
-* Current balances
-* Outstanding settlements
-
-## FR-37 — Report Format
-
-For the MVP, the report should be exportable as **PDF or CSV**.
-
-If implementation time is limited, **CSV should be prioritized** because it is significantly simpler to implement reliably within the hackathon.
+| ID | Requirement |
+|----|-------------|
+| FR-36 | **Export Report:** Contains group name, members, outings/expenses, dates, categories, payers, individual shares, total expenses, balances, outstanding settlements. |
+| FR-37 | **Format:** PDF or CSV. **Prioritize CSV** (simpler for hackathon). |
 
 ---
 
-# 17. Core Business Rules
+## 17. Core Business Rules
 
-### BR-1 — Expense validity
-
-For every expense:
-
-> **Total expense = Sum of all participant shares**
-
-### BR-2 — Payer
-
-Every expense must have exactly one payer.
-
-### BR-3 — Participants
-
-Every expense must have at least one participant.
-
-### BR-4 — Balance
-
-For every user:
-
-> **Balance = Amount Paid − Amount Owed**
-
-### BR-5 — Group balance
-
-The sum of all member balances in a group should equal zero, excluding any special treatment required for rounding.
-
-### BR-6 — AI confirmation
-
-AI-generated expenses must be reviewed/confirmed by the user before becoming official expenses.
-
-### BR-7 — AI independence
-
-AI/OCR failure must never prevent manual expense entry.
+| ID | Rule |
+|----|------|
+| BR-1 | **Expense Validity:** Total expense = Sum of all participant shares |
+| BR-2 | **Payer:** Exactly one payer per expense |
+| BR-3 | **Participants:** At least one participant per expense |
+| BR-4 | **Balance:** Balance = Amount Paid − Amount Owed |
+| BR-5 | **Group Balance:** Sum of all member balances = zero (excluding rounding) |
+| BR-6 | **AI Confirmation:** AI-generated expenses must be reviewed/confirmed before becoming official |
+| BR-7 | **AI Independence:** AI/OCR failure must never prevent manual expense entry |
 
 ---
 
-# 18. MVP Scope for the 4-Hour Hackathon
-
-Because you only have **4 hours**, I'd formally divide the requirements into priorities.
+## 18. MVP Scope (4-Hour Hackathon)
 
 ### 🔴 Must Have
-
-**Authentication**
-
-* Sign up
-* Sign in
-
-**Groups**
-
-* Create group
-* Add friends/members
-* Group cards
-* Group financial status
-
-**Expenses**
-
-* Create expense
-* Category
-* Description
-* Amount
-* Payer
-* Participants
-* Equal split
-* Custom split
-
-**Financial Engine**
-
-* Automatic balances
-* Who owes whom
-* Debt simplification
-* Positive/negative balance indicators
-
-**AI**
-
-* Natural-language expense entry
-* LLM → structured JSON → normal expense form
-* Manual fallback
+- **Authentication:** Sign up, Sign in
+- **Groups:** Create group, Add friends/members, Group cards, Financial status
+- **Expenses:** Create expense, Category, Description, Amount, Payer, Participants, Equal split, Custom split
+- **Financial Engine:** Automatic balances, Who owes whom, Debt simplification, Positive/negative indicators
+- **AI:** Natural-language entry, LLM → JSON → normal form, Manual fallback
 
 ### 🟠 Should Have
-
-* Receipt image upload
-* OCR
-* Manual purchased-item entry
-* OCR → item entry
-* Settlement status
+- Receipt image upload, OCR, Manual purchased-item entry, OCR → item entry, Settlement status
 
 ### 🟢 Stretch
-
-* Item-level participant assignment
-* OCR → structured item extraction
-* Expense images
-* PDF export
-* Advanced spending analytics
+- Item-level participant assignment, OCR → structured item extraction, Expense images, PDF export, Advanced spending analytics
 
 ---
 
-## One thing I'd change from your original flow
+## Recommended Architecture Note
 
-I'd make **"Outing" and "Expense" explicitly separate concepts**:
+**Consider separating "Outing" and "Expense" concepts:**
 
-```text
+```
 GROUP
-  │
   ├── Outing: "Dinner at Pizza Hut"
-  │      │
   │      ├── Expense: Pizza
   │      ├── Expense: Drinks
   │      └── Expense: Uber
-  │
   ├── Outing: "Alexandria Trip"
-  │      │
   │      ├── Expense: Hotel
   │      └── Expense: Food
-  │
   └── ...
 ```
 
-But **if you want the simplest possible implementation**, you can initially treat an outing as a container for expenses and avoid overengineering it.
+> **Simplest implementation:** Treat an outing as a container for expenses; avoid overengineering.
 
-Most importantly, your core architecture should be:
+**Core Architecture:**
+```
+Manual Entry → AI-assisted Entry → OCR-assisted Entry
+                        ↓
+              Same Expense Model
+                        ↓
+              Same Balance Engine
+```
 
-**Manual Entry → AI-assisted Entry → OCR-assisted Entry → same Expense model → same Balance Engine.**
-
-That gives you one reliable financial engine while making the AI features the "wow" layer on top.
+One reliable financial engine + AI features as the "wow" layer on top.
