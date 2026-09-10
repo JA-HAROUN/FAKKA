@@ -44,11 +44,11 @@ class BalanceControllerWebMvcTest {
     void listBalancesReturnsPaidOwedAndNetForEveryMember() throws Exception {
         given(balanceService.listMemberBalances(10L)).willReturn(List.of(
                 new MemberBalanceResponse(1L, "Ahmed Ragy", null,
-                        90_000L, 30_000L, 60_000L, BalanceStatus.POSITIVE),
+                        90_000L, 30_000L, 0L, 0L, 60_000L, BalanceStatus.POSITIVE),
                 new MemberBalanceResponse(2L, "Mohamed Salah", "https://img.example.com/m.jpg",
-                        0L, 30_000L, -30_000L, BalanceStatus.NEGATIVE),
+                        0L, 30_000L, 0L, 0L, -30_000L, BalanceStatus.NEGATIVE),
                 new MemberBalanceResponse(3L, "Zeinab Hassan", null,
-                        30_000L, 30_000L, 0L, BalanceStatus.SETTLED)));
+                        30_000L, 30_000L, 0L, 0L, 0L, BalanceStatus.SETTLED)));
 
         mockMvc.perform(get("/api/groups/{groupId}/balances", 10))
                 .andExpect(status().isOk())
@@ -58,6 +58,8 @@ class BalanceControllerWebMvcTest {
                 .andExpect(jsonPath("$[0].profileImageUrl").doesNotExist())
                 .andExpect(jsonPath("$[0].paid").value(90000))
                 .andExpect(jsonPath("$[0].owed").value(30000))
+                .andExpect(jsonPath("$[0].settledOut").value(0))
+                .andExpect(jsonPath("$[0].settledIn").value(0))
                 .andExpect(jsonPath("$[0].net").value(60000))
                 .andExpect(jsonPath("$[0].status").value("POSITIVE"))
                 .andExpect(jsonPath("$[1].net").value(-30000))
@@ -68,12 +70,37 @@ class BalanceControllerWebMvcTest {
                 .andExpect(jsonPath("$[0].email").doesNotExist());
     }
 
+    /**
+     * Settlements travel as their own two fields rather than folded into paid and owed, so a
+     * client can show why a balance came down without inferring it.
+     */
+    @Test
+    void listBalancesReportsSettlementsSeparatelyFromExpenses() throws Exception {
+        given(balanceService.listMemberBalances(10L)).willReturn(List.of(
+                // Paid 900 for a 300 share, then was handed 600 back: square.
+                new MemberBalanceResponse(1L, "Ahmed Ragy", null,
+                        90_000L, 30_000L, 0L, 60_000L, 0L, BalanceStatus.SETTLED),
+                new MemberBalanceResponse(2L, "Mohamed Salah", null,
+                        0L, 30_000L, 30_000L, 0L, 0L, BalanceStatus.SETTLED)));
+
+        mockMvc.perform(get("/api/groups/{groupId}/balances", 10))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].paid").value(90000))
+                .andExpect(jsonPath("$[0].owed").value(30000))
+                .andExpect(jsonPath("$[0].settledIn").value(60000))
+                .andExpect(jsonPath("$[0].settledOut").value(0))
+                .andExpect(jsonPath("$[0].net").value(0))
+                .andExpect(jsonPath("$[0].status").value("SETTLED"))
+                .andExpect(jsonPath("$[1].settledOut").value(30000))
+                .andExpect(jsonPath("$[1].net").value(0));
+    }
+
     /** Whole piastres on the wire, never a decimal: the API has one unit and it is the minor one. */
     @Test
     void balancesAreSerialisedAsWholePiastres() throws Exception {
         given(balanceService.listMemberBalances(10L)).willReturn(List.of(
                 new MemberBalanceResponse(1L, "Ahmed Ragy", null,
-                        100L, 34L, 66L, BalanceStatus.POSITIVE)));
+                        100L, 34L, 0L, 0L, 66L, BalanceStatus.POSITIVE)));
 
         mockMvc.perform(get("/api/groups/{groupId}/balances", 10))
                 .andExpect(status().isOk())

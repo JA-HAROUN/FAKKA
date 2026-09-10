@@ -5,7 +5,8 @@ import org.springframework.http.HttpStatus;
 import java.util.Collection;
 
 /**
- * An expense named a payer or a participant who is not in the group (FR-16, FR-17).
+ * Somebody outside the group was named in something that only members can take part in: a
+ * payer or participant on an expense (FR-16, FR-17), or a party to a settlement (FR-34).
  * <p>
  * 400 rather than 403, for the same reason as {@link NonFriendMemberException}: there is no
  * authorisation here, the payload is simply invalid. Every offending id is listed at once so the
@@ -18,8 +19,11 @@ import java.util.Collection;
 public class NonGroupMemberException extends ApiException {
 
     public NonGroupMemberException(Collection<Long> userIds) {
+        /*
+         * Deliberately says nothing about what was being attempted. Expenses and settlements
+         * both raise this, and a message naming one of them would be wrong half the time.
+         */
         super(HttpStatus.BAD_REQUEST,
-                "Users %s are not members of this group, so they cannot pay for or share an expense"
-                        .formatted(userIds));
+                "Users %s are not members of this group".formatted(userIds));
     }
 }

@@ -318,8 +318,7 @@ class ExpenseControllerWebMvcTest {
                                  "totalAmount":100,"participantUserIds":[1,2]}
                                 """))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.message").value("Users [9] are not members of this group, "
-                        + "so they cannot pay for or share an expense"))
+                .andExpect(jsonPath("$.message").value("Users [9] are not members of this group"))
                 .andExpect(jsonPath("$.path").value("/api/groups/10/expenses"));
     }
 

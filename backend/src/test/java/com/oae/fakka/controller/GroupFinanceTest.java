@@ -2,8 +2,11 @@ package com.oae.fakka.controller;
 
 import com.jayway.jsonpath.JsonPath;
 import com.oae.fakka.entity.Friendship;
+import com.oae.fakka.entity.SettlementStatus;
 import com.oae.fakka.entity.User;
+import com.oae.fakka.repository.ExpenseRepository;
 import com.oae.fakka.repository.FriendshipRepository;
+import com.oae.fakka.repository.SettlementRepository;
 import com.oae.fakka.repository.UserRepository;
 import com.oae.fakka.service.BalanceService;
 import org.junit.jupiter.api.BeforeEach;
@@ -22,6 +25,7 @@ import java.util.stream.Collectors;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -50,6 +54,12 @@ class GroupFinanceTest {
 
     @Autowired
     private FriendshipRepository friendshipRepository;
+
+    @Autowired
+    private ExpenseRepository expenseRepository;
+
+    @Autowired
+    private SettlementRepository settlementRepository;
 
     @Autowired
     private BalanceService balanceService;
@@ -258,12 +268,264 @@ class GroupFinanceTest {
                 .andExpect(jsonPath("$.message").value("Group 999999 was not found"));
     }
 
+    /*
+     * Settlements (FR-34, FR-35). The loop that matters: an expense creates a debt, the
+     * suggestion says who should pay, the payment is recorded and then confirmed, and the group
+     * comes out settled without any expense being touched.
+     */
+
+    /** Recording a settlement is not paying it, so nothing about the balances moves yet. */
+    @Test
+    void aPendingSettlementLeavesEveryBalanceWhereItWas() throws Exception {
+        recordExpense(ahmed, 90_000L, List.of(ahmed, mohamed, zeinab));
+
+        createSettlement(mohamed, ahmed, 30_000L);
+
+        assertThat(balanceService.calculateGroupBalancesInPiastres(groupId))
+                .containsExactlyInAnyOrderEntriesOf(Map.of(
+                        ahmed.getId(), 60_000L,
+                        mohamed.getId(), -30_000L,
+                        zeinab.getId(), -30_000L));
+
+        // The suggestion still asks for the same two payments, because none has been made.
+        mockMvc.perform(get("/api/groups/{groupId}/settlements/suggested", groupId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(2));
+    }
+
+    /** Paying it nets the amount out in both directions at once. */
+    @Test
+    void payingASettlementMovesBothBalances() throws Exception {
+        recordExpense(ahmed, 90_000L, List.of(ahmed, mohamed, zeinab));
+
+        long settlementId = createSettlement(mohamed, ahmed, 30_000L);
+        markPaid(settlementId, mohamed);
+
+        assertThat(balanceService.calculateGroupBalancesInPiastres(groupId))
+                .containsExactlyInAnyOrderEntriesOf(Map.of(
+                        ahmed.getId(), 30_000L,
+                        mohamed.getId(), 0L,
+                        zeinab.getId(), -30_000L));
+        assertThat(balanceService.groupBalancesSumToZero(groupId)).as("BR-5 after a payment").isTrue();
+    }
+
+    /** The full loop: settle every suggestion and the group is square, with no expense altered. */
+    @Test
+    void payingEverySuggestedSettlementSettlesTheGroup() throws Exception {
+        recordExpense(ahmed, 90_000L, List.of(ahmed, mohamed, zeinab));
+
+        for (Map<String, Object> suggestion : suggestedSettlements()) {
+            long from = ((Number) suggestion.get("fromUserId")).longValue();
+            long to = ((Number) suggestion.get("toUserId")).longValue();
+            long amount = ((Number) suggestion.get("amount")).longValue();
+            markPaid(createSettlement(from, to, amount), from);
+        }
+
+        assertThat(balanceService.calculateGroupBalancesInPiastres(groupId).values())
+                .allSatisfy(balance -> assertThat(balance).isZero());
+        assertThat(suggestedSettlements()).as("nothing left to settle").isEmpty();
+        assertThat(expenseRepository.count()).as("the expense is untouched").isEqualTo(1);
+
+        mockMvc.perform(get("/api/groups/{groupId}/balances", groupId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].status").value("SETTLED"))
+                .andExpect(jsonPath("$[1].status").value("SETTLED"))
+                .andExpect(jsonPath("$[2].status").value("SETTLED"));
+    }
+
+    /** The breakdown keeps settlements in their own columns, so the net stays explainable. */
+    @Test
+    void theBreakdownShowsSettlementsSeparatelyFromExpenses() throws Exception {
+        recordExpense(ahmed, 90_000L, List.of(ahmed, mohamed, zeinab));
+        markPaid(createSettlement(mohamed, ahmed, 30_000L), ahmed);
+
+        mockMvc.perform(get("/api/groups/{groupId}/balances", groupId))
+                .andExpect(status().isOk())
+                // Ahmed: paid 900, consumed 300, and has been handed 300 back.
+                .andExpect(jsonPath("$[0].name").value("Ahmed Ragy"))
+                .andExpect(jsonPath("$[0].paid").value(90000))
+                .andExpect(jsonPath("$[0].owed").value(30000))
+                .andExpect(jsonPath("$[0].settledOut").value(0))
+                .andExpect(jsonPath("$[0].settledIn").value(30000))
+                .andExpect(jsonPath("$[0].net").value(30000))
+                // Mohamed: consumed 300 and has now paid it.
+                .andExpect(jsonPath("$[1].owed").value(30000))
+                .andExpect(jsonPath("$[1].settledOut").value(30000))
+                .andExpect(jsonPath("$[1].net").value(0))
+                .andExpect(jsonPath("$[1].status").value("SETTLED"));
+    }
+
+    /** Part payment: the debt comes down by what was handed over and no more. */
+    @Test
+    void aPartPaymentLeavesTheRemainderToSettle() throws Exception {
+        recordExpense(ahmed, 90_000L, List.of(ahmed, mohamed, zeinab));
+
+        markPaid(createSettlement(mohamed, ahmed, 10_000L), mohamed);
+
+        assertThat(balanceService.calculateUserBalanceInPiastres(mohamed.getId(), groupId))
+                .isEqualTo(-20_000L);
+        assertThat(suggestedSettlements())
+                .anySatisfy(suggestion -> {
+                    assertThat(((Number) suggestion.get("fromUserId")).longValue())
+                            .isEqualTo(mohamed.getId());
+                    assertThat(((Number) suggestion.get("amount")).longValue()).isEqualTo(20_000L);
+                });
+    }
+
+    /** The dashboard card reads the same engine, so a payment shows up there too. */
+    @Test
+    void payingASettlementUpdatesTheDashboardCard() throws Exception {
+        recordExpense(ahmed, 90_000L, List.of(ahmed, mohamed, zeinab));
+
+        mockMvc.perform(get("/api/users/{userId}/groups", mohamed.getId()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].userBalance").value(-30000))
+                .andExpect(jsonPath("$[0].status").value("NEGATIVE"));
+
+        markPaid(createSettlement(mohamed, ahmed, 30_000L), mohamed);
+
+        mockMvc.perform(get("/api/users/{userId}/groups", mohamed.getId()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].userBalance").value(0))
+                .andExpect(jsonPath("$[0].status").value("SETTLED"));
+    }
+
+    /** Over-paying is allowed, and pushes the balance past zero rather than being clamped. */
+    @Test
+    void overPayingASettlementFlipsTheBalance() throws Exception {
+        recordExpense(ahmed, 90_000L, List.of(ahmed, mohamed, zeinab));
+
+        markPaid(createSettlement(mohamed, ahmed, 50_000L), mohamed);
+
+        assertThat(balanceService.calculateUserBalanceInPiastres(mohamed.getId(), groupId))
+                .as("paid 500 against a 300 debt")
+                .isEqualTo(20_000L);
+        assertThat(balanceService.groupBalancesSumToZero(groupId)).isTrue();
+    }
+
+    @Test
+    void aSettlementBetweenNonMembersIsRejected() throws Exception {
+        User outsider = createUser("Stranger Danger", "stranger@example.com");
+
+        mockMvc.perform(post("/api/groups/{groupId}/settlements", groupId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"fromUserId":%d,"toUserId":%d,"amount":30000}
+                                """.formatted(outsider.getId(), ahmed.getId())))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message")
+                        .value("Users [%d] are not members of this group".formatted(outsider.getId())));
+
+        assertThat(settlementRepository.count()).isZero();
+    }
+
+    /** FR-35: a third party cannot confirm somebody else payment, even inside the same group. */
+    @Test
+    void aMemberWhoIsNotAPartyCannotMarkASettlementPaid() throws Exception {
+        long settlementId = createSettlement(mohamed, ahmed, 30_000L);
+
+        mockMvc.perform(patch("/api/settlements/{settlementId}/pay", settlementId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"userId":%d}
+                                """.formatted(zeinab.getId())))
+                .andExpect(status().isForbidden());
+
+        assertThat(settlementRepository.findById(settlementId))
+                .get()
+                .satisfies(settlement -> {
+                    assertThat(settlement.getStatus()).isEqualTo(SettlementStatus.PENDING);
+                    assertThat(settlement.getPaidAt()).isNull();
+                });
+    }
+
+    @Test
+    void aSettlementCannotBePaidTwice() throws Exception {
+        long settlementId = createSettlement(mohamed, ahmed, 30_000L);
+        markPaid(settlementId, mohamed);
+
+        mockMvc.perform(patch("/api/settlements/{settlementId}/pay", settlementId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"userId":%d}
+                                """.formatted(ahmed.getId())))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.message").value(
+                        org.hamcrest.Matchers.startsWith("Settlement %d was already marked paid at "
+                                .formatted(settlementId))));
+    }
+
+    @Test
+    void markingAnUnknownSettlementPaidIsA404() throws Exception {
+        mockMvc.perform(patch("/api/settlements/{settlementId}/pay", 999999)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"userId":%d}
+                                """.formatted(ahmed.getId())))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.message").value("Settlement 999999 was not found"));
+    }
+
+    /** A payment in one group must not settle a debt in another. */
+    @Test
+    void paidSettlementsAreScopedToTheirGroup() throws Exception {
+        long otherGroupId = createGroup(ahmed, List.of(mohamed));
+        recordExpense(ahmed, 90_000L, List.of(ahmed, mohamed, zeinab));
+
+        markPaid(createSettlement(mohamed, ahmed, 30_000L), mohamed);
+
+        assertThat(balanceService.calculateGroupBalancesInPiastres(otherGroupId).values())
+                .allSatisfy(balance -> assertThat(balance).isZero());
+        assertThat(balanceService.calculateUserBalanceInPiastres(ahmed.getId(), otherGroupId)).isZero();
+    }
+
     private User createUser(String name, String email) {
         return userRepository.saveAndFlush(User.builder()
                 .name(name)
                 .email(email)
                 .passwordHash(DUMMY_HASH)
                 .build());
+    }
+
+    private long createSettlement(User from, User to, long amount) throws Exception {
+        return createSettlement(from.getId(), to.getId(), amount);
+    }
+
+    private long createSettlement(long fromUserId, long toUserId, long amount) throws Exception {
+        String response = mockMvc.perform(post("/api/groups/{groupId}/settlements", groupId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"fromUserId":%d,"toUserId":%d,"amount":%d}
+                                """.formatted(fromUserId, toUserId, amount)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.status").value("PENDING"))
+                .andReturn().getResponse().getContentAsString();
+
+        return JsonPath.parse(response).read("$.id", Integer.class).longValue();
+    }
+
+    private void markPaid(long settlementId, User claimant) throws Exception {
+        markPaid(settlementId, claimant.getId());
+    }
+
+    private void markPaid(long settlementId, long claimantUserId) throws Exception {
+        mockMvc.perform(patch("/api/settlements/{settlementId}/pay", settlementId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"userId":%d}
+                                """.formatted(claimantUserId)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("PAID"))
+                .andExpect(jsonPath("$.paidAt").exists());
+    }
+
+    private List<Map<String, Object>> suggestedSettlements() throws Exception {
+        String response = mockMvc.perform(
+                        get("/api/groups/{groupId}/settlements/suggested", groupId))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        return JsonPath.parse(response).read("$");
     }
 
     private void befriend(User first, User second) {

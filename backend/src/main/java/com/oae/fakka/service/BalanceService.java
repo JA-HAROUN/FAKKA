@@ -8,6 +8,7 @@ import com.oae.fakka.repository.ExpenseRepository;
 import com.oae.fakka.repository.GroupAmount;
 import com.oae.fakka.repository.GroupMemberRepository;
 import com.oae.fakka.repository.GroupRepository;
+import com.oae.fakka.repository.SettlementRepository;
 import com.oae.fakka.repository.UserAmount;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -26,11 +27,19 @@ import java.util.stream.Collectors;
  * <h2>The formula</h2>
  * <pre>
  *   balance = everything this member paid as payer in the group
+ *           + settlements they have paid out        (PAID only)
  *           - everything this member owes as a participant in the group
+ *           - settlements they have received        (PAID only)
  * </pre>
- * Positive means the group owes them, negative means they owe the group. Settlements are not
- * subtracted yet because none can be recorded: FR-34 and FR-35 need a stored settlement, and
- * when it exists it belongs in exactly this subtraction and nowhere else.
+ * Positive means the group owes them, negative means they owe the group.
+ * <p>
+ * A PAID settlement counts exactly like an expense in the opposite direction: handing somebody
+ * 200 credits the payer and debits the recipient, which is what lets a debt come down without
+ * any expense being edited or deleted. A PENDING one contributes nothing, because until the
+ * money moves the debt is still owed.
+ * <p>
+ * BR-5 survives the addition: every settlement gives one member exactly what it takes from
+ * another, so the group still sums to zero.
  *
  * <h2>Units: two types, one number</h2>
  * Every sum happens in {@code long} piastres, because that is what the columns hold and because
@@ -55,16 +64,19 @@ public class BalanceService {
     private final GroupMemberRepository groupMemberRepository;
     private final ExpenseRepository expenseRepository;
     private final ExpenseParticipantRepository expenseParticipantRepository;
+    private final SettlementRepository settlementRepository;
 
     public BalanceService(
             GroupRepository groupRepository,
             GroupMemberRepository groupMemberRepository,
             ExpenseRepository expenseRepository,
-            ExpenseParticipantRepository expenseParticipantRepository) {
+            ExpenseParticipantRepository expenseParticipantRepository,
+            SettlementRepository settlementRepository) {
         this.groupRepository = groupRepository;
         this.groupMemberRepository = groupMemberRepository;
         this.expenseRepository = expenseRepository;
         this.expenseParticipantRepository = expenseParticipantRepository;
+        this.settlementRepository = settlementRepository;
     }
 
     /**
@@ -87,7 +99,9 @@ public class BalanceService {
     public long calculateUserBalanceInPiastres(Long userId, Long groupId) {
         long paid = expenseRepository.sumPaidByUserInGroup(groupId, userId);
         long owed = expenseParticipantRepository.sumOwedByUserInGroup(groupId, userId);
-        return paid - owed;
+        long settledOut = settlementRepository.sumPaidOutByUserInGroup(groupId, userId);
+        long settledIn = settlementRepository.sumReceivedByUserInGroup(groupId, userId);
+        return (paid + settledOut) - (owed + settledIn);
     }
 
     /** Every member balance in a group, in EGP, keyed by user id. */
@@ -102,22 +116,21 @@ public class BalanceService {
     /**
      * Every member balance in a group, in piastres, keyed by user id.
      * <p>
-     * Three queries regardless of group size: the members, what each paid, what each owes. The
-     * result always sums to zero (BR-5), because every expense adds its total to one payer and
-     * subtracts shares that sum to the same total.
+     * Five queries regardless of group size: the members, then the four terms of the formula.
+     * The result always sums to zero (BR-5), because every expense adds its total to one payer
+     * and subtracts shares that sum to the same total, and every paid settlement moves one
+     * amount between two members.
      */
     @Transactional(readOnly = true)
     public SequencedMap<Long, Long> calculateGroupBalancesInPiastres(Long groupId) {
         requireGroupExists(groupId);
 
         List<Long> memberIds = groupMemberRepository.findUserIdsOf(groupId);
-        Map<Long, Long> paid = amountsByUser(expenseRepository.sumPaidPerPayerInGroup(groupId));
-        Map<Long, Long> owed =
-                amountsByUser(expenseParticipantRepository.sumOwedPerParticipantInGroup(groupId));
+        GroupTotals totals = totalsOf(groupId);
 
         SequencedMap<Long, Long> balances = new LinkedHashMap<>();
         for (Long memberId : memberIds) {
-            balances.put(memberId, paid.getOrDefault(memberId, 0L) - owed.getOrDefault(memberId, 0L));
+            balances.put(memberId, totals.balanceOf(memberId));
         }
         return balances;
     }
@@ -133,24 +146,24 @@ public class BalanceService {
         requireGroupExists(groupId);
 
         List<User> members = groupMemberRepository.findMembersOf(groupId);
-        Map<Long, Long> paid = amountsByUser(expenseRepository.sumPaidPerPayerInGroup(groupId));
-        Map<Long, Long> owed =
-                amountsByUser(expenseParticipantRepository.sumOwedPerParticipantInGroup(groupId));
+        GroupTotals totals = totalsOf(groupId);
 
         return members.stream()
                 .map(member -> MemberBalanceResponse.of(
                         member,
-                        paid.getOrDefault(member.getId(), 0L),
-                        owed.getOrDefault(member.getId(), 0L)))
+                        totals.paidFor(member.getId()),
+                        totals.owedBy(member.getId()),
+                        totals.settledOutBy(member.getId()),
+                        totals.settledInBy(member.getId())))
                 .toList();
     }
 
     /**
      * One member balance in each of several groups, in piastres, for the dashboard (FR-4).
      * <p>
-     * Two queries for the whole dashboard rather than two per card, which is what the earlier
-     * per-group call would have become once this stopped being a stub. Groups where the member
-     * has no activity are still present, reading 0.
+     * Four queries for the whole dashboard rather than four per card: one per term of the
+     * formula, each grouped by group id. Groups where the member has no activity are still
+     * present, reading 0.
      */
     @Transactional(readOnly = true)
     public Map<Long, Long> calculateUserBalanceInGroups(Long userId, Collection<Long> groupIds) {
@@ -162,10 +175,16 @@ public class BalanceService {
         Map<Long, Long> paid = amountsByGroup(expenseRepository.sumPaidByUserPerGroup(userId, groupIds));
         Map<Long, Long> owed =
                 amountsByGroup(expenseParticipantRepository.sumOwedByUserPerGroup(userId, groupIds));
+        Map<Long, Long> settledOut =
+                amountsByGroup(settlementRepository.sumPaidOutByUserPerGroup(userId, groupIds));
+        Map<Long, Long> settledIn =
+                amountsByGroup(settlementRepository.sumReceivedByUserPerGroup(userId, groupIds));
 
         Map<Long, Long> balances = new LinkedHashMap<>();
         for (Long groupId : groupIds) {
-            balances.put(groupId, paid.getOrDefault(groupId, 0L) - owed.getOrDefault(groupId, 0L));
+            balances.put(groupId,
+                    (paid.getOrDefault(groupId, 0L) + settledOut.getOrDefault(groupId, 0L))
+                            - (owed.getOrDefault(groupId, 0L) + settledIn.getOrDefault(groupId, 0L)));
         }
         return balances;
     }
@@ -197,6 +216,49 @@ public class BalanceService {
      */
     private static BigDecimal toEgp(long piastres) {
         return BigDecimal.valueOf(piastres, 2);
+    }
+
+    /**
+     * The four per-member totals for one group, fetched once.
+     * <p>
+     * Exists so the breakdown and the id-only balance map are assembled from the same numbers by
+     * the same code: two callers each adding up the formula themselves is how the two views would
+     * eventually come to disagree.
+     */
+    private GroupTotals totalsOf(Long groupId) {
+        return new GroupTotals(
+                amountsByUser(expenseRepository.sumPaidPerPayerInGroup(groupId)),
+                amountsByUser(expenseParticipantRepository.sumOwedPerParticipantInGroup(groupId)),
+                amountsByUser(settlementRepository.sumPaidOutPerUserInGroup(groupId)),
+                amountsByUser(settlementRepository.sumReceivedPerUserInGroup(groupId)));
+    }
+
+    /** Absent means zero throughout: a member with no activity has totals, not holes. */
+    private record GroupTotals(
+            Map<Long, Long> paid,
+            Map<Long, Long> owed,
+            Map<Long, Long> settledOut,
+            Map<Long, Long> settledIn) {
+
+        long paidFor(Long userId) {
+            return paid.getOrDefault(userId, 0L);
+        }
+
+        long owedBy(Long userId) {
+            return owed.getOrDefault(userId, 0L);
+        }
+
+        long settledOutBy(Long userId) {
+            return settledOut.getOrDefault(userId, 0L);
+        }
+
+        long settledInBy(Long userId) {
+            return settledIn.getOrDefault(userId, 0L);
+        }
+
+        long balanceOf(Long userId) {
+            return (paidFor(userId) + settledOutBy(userId)) - (owedBy(userId) + settledInBy(userId));
+        }
     }
 
     private void requireGroupExists(Long groupId) {

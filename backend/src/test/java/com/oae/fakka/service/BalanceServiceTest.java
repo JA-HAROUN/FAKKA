@@ -9,6 +9,7 @@ import com.oae.fakka.repository.ExpenseRepository;
 import com.oae.fakka.repository.GroupAmount;
 import com.oae.fakka.repository.GroupMemberRepository;
 import com.oae.fakka.repository.GroupRepository;
+import com.oae.fakka.repository.SettlementRepository;
 import com.oae.fakka.repository.UserAmount;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -54,6 +55,9 @@ class BalanceServiceTest {
 
     @Mock
     private ExpenseParticipantRepository expenseParticipantRepository;
+
+    @Mock
+    private SettlementRepository settlementRepository;
 
     @InjectMocks
     private BalanceService balanceService;
@@ -246,7 +250,138 @@ class BalanceServiceTest {
     void balancesAcrossGroupsSkipsTheQueriesWhenThereAreNoGroups() {
         assertThat(balanceService.calculateUserBalanceInGroups(1L, List.of())).isEmpty();
 
-        verifyNoInteractions(expenseRepository, expenseParticipantRepository);
+        verifyNoInteractions(expenseRepository, expenseParticipantRepository, settlementRepository);
+    }
+
+    /*
+     * Settlements (FR-35). A paid one counts like an expense in the opposite direction, so the
+     * payer is credited and the recipient debited. The repository only ever returns PAID rows --
+     * that filter lives in the query -- so what is asserted here is the arithmetic on top of it.
+     */
+
+    /** Paying somebody reduces what you owe; being paid reduces what you are owed. */
+    @ParameterizedTest
+    @CsvSource({
+            // paid, owed, settledOut, settledIn, balance
+            "0, 30000, 30000, 0, 0",
+            "90000, 30000, 0, 60000, 0",
+            "0, 30000, 10000, 0, -20000",
+            "90000, 30000, 0, 20000, 40000",
+            "0, 0, 5000, 0, 5000",
+            "0, 0, 0, 5000, -5000",
+    })
+    void aPaidSettlementCountsAsAnExpenseInTheOppositeDirection(
+            long paid, long owed, long settledOut, long settledIn, long expectedBalance) {
+
+        given(expenseRepository.sumPaidByUserInGroup(GROUP_ID, 1L)).willReturn(paid);
+        given(expenseParticipantRepository.sumOwedByUserInGroup(GROUP_ID, 1L)).willReturn(owed);
+        given(settlementRepository.sumPaidOutByUserInGroup(GROUP_ID, 1L)).willReturn(settledOut);
+        given(settlementRepository.sumReceivedByUserInGroup(GROUP_ID, 1L)).willReturn(settledIn);
+
+        assertThat(balanceService.calculateUserBalanceInPiastres(1L, GROUP_ID))
+                .isEqualTo(expectedBalance);
+    }
+
+    /**
+     * The whole point of the feature: after the debtor pays, both sides read zero and the group
+     * is settled without either expense being touched.
+     */
+    @Test
+    void payingASettlementSettlesTheGroup() {
+        givenGroupExists();
+        given(groupMemberRepository.findUserIdsOf(GROUP_ID)).willReturn(List.of(1L, 2L));
+        given(expenseRepository.sumPaidPerPayerInGroup(GROUP_ID))
+                .willReturn(List.of(userAmount(1L, 35_000L)));
+        given(expenseParticipantRepository.sumOwedPerParticipantInGroup(GROUP_ID))
+                .willReturn(List.of(userAmount(1L, 17_500L), userAmount(2L, 17_500L)));
+        given(settlementRepository.sumPaidOutPerUserInGroup(GROUP_ID))
+                .willReturn(List.of(userAmount(2L, 17_500L)));
+        given(settlementRepository.sumReceivedPerUserInGroup(GROUP_ID))
+                .willReturn(List.of(userAmount(1L, 17_500L)));
+
+        Map<Long, Long> balances = balanceService.calculateGroupBalancesInPiastres(GROUP_ID);
+
+        assertThat(balances).containsExactlyInAnyOrderEntriesOf(Map.of(1L, 0L, 2L, 0L));
+        assertThat(BalanceService.balancesSumToZero(balances)).as("BR-5 still holds").isTrue();
+    }
+
+    /** A part payment moves the balance part of the way, not all of it. */
+    @Test
+    void aPartPaymentLeavesTheRemainderOutstanding() {
+        givenGroupExists();
+        given(groupMemberRepository.findUserIdsOf(GROUP_ID)).willReturn(List.of(1L, 2L));
+        given(expenseRepository.sumPaidPerPayerInGroup(GROUP_ID))
+                .willReturn(List.of(userAmount(1L, 35_000L)));
+        given(expenseParticipantRepository.sumOwedPerParticipantInGroup(GROUP_ID))
+                .willReturn(List.of(userAmount(1L, 17_500L), userAmount(2L, 17_500L)));
+        given(settlementRepository.sumPaidOutPerUserInGroup(GROUP_ID))
+                .willReturn(List.of(userAmount(2L, 10_000L)));
+        given(settlementRepository.sumReceivedPerUserInGroup(GROUP_ID))
+                .willReturn(List.of(userAmount(1L, 10_000L)));
+
+        assertThat(balanceService.calculateGroupBalancesInPiastres(GROUP_ID))
+                .containsExactlyInAnyOrderEntriesOf(Map.of(1L, 7_500L, 2L, -7_500L));
+    }
+
+    /**
+     * Over-paying is allowed and simply pushes the balance past zero the other way, which is what
+     * lets somebody hand over a round number and be owed the change.
+     */
+    @Test
+    void overPayingFlipsTheBalanceTheOtherWay() {
+        given(expenseRepository.sumPaidByUserInGroup(GROUP_ID, 1L)).willReturn(0L);
+        given(expenseParticipantRepository.sumOwedByUserInGroup(GROUP_ID, 1L)).willReturn(17_500L);
+        given(settlementRepository.sumPaidOutByUserInGroup(GROUP_ID, 1L)).willReturn(20_000L);
+        given(settlementRepository.sumReceivedByUserInGroup(GROUP_ID, 1L)).willReturn(0L);
+
+        assertThat(balanceService.calculateUserBalanceInPiastres(1L, GROUP_ID)).isEqualTo(2_500L);
+    }
+
+    /** The breakdown keeps settlements in their own columns so the net stays explainable. */
+    @Test
+    void memberBalancesReportSettlementsSeparatelyFromExpenses() {
+        givenGroupExists();
+        given(groupMemberRepository.findMembersOf(GROUP_ID)).willReturn(List.of(
+                user(1L, "Ahmed Ragy", null), user(2L, "Mohamed Salah", null)));
+        given(expenseRepository.sumPaidPerPayerInGroup(GROUP_ID))
+                .willReturn(List.of(userAmount(1L, 35_000L)));
+        given(expenseParticipantRepository.sumOwedPerParticipantInGroup(GROUP_ID))
+                .willReturn(List.of(userAmount(1L, 17_500L), userAmount(2L, 17_500L)));
+        given(settlementRepository.sumPaidOutPerUserInGroup(GROUP_ID))
+                .willReturn(List.of(userAmount(2L, 17_500L)));
+        given(settlementRepository.sumReceivedPerUserInGroup(GROUP_ID))
+                .willReturn(List.of(userAmount(1L, 17_500L)));
+
+        List<MemberBalanceResponse> balances = balanceService.listMemberBalances(GROUP_ID);
+
+        assertThat(balances)
+                .extracting(MemberBalanceResponse::userId, MemberBalanceResponse::paid,
+                        MemberBalanceResponse::owed, MemberBalanceResponse::settledOut,
+                        MemberBalanceResponse::settledIn, MemberBalanceResponse::net,
+                        MemberBalanceResponse::status)
+                .containsExactly(
+                        tuple(1L, 35_000L, 17_500L, 0L, 17_500L, 0L, BalanceStatus.SETTLED),
+                        tuple(2L, 0L, 17_500L, 17_500L, 0L, 0L, BalanceStatus.SETTLED));
+        assertThat(balances).allSatisfy(balance -> assertThat(balance.net())
+                .as("net is derivable from the parts")
+                .isEqualTo((balance.paid() + balance.settledOut())
+                        - (balance.owed() + balance.settledIn())));
+    }
+
+    /** The dashboard nets settlements too, or a settled group would still show a debt on its card. */
+    @Test
+    void balancesAcrossGroupsNetOutPaidSettlements() {
+        given(expenseRepository.sumPaidByUserPerGroup(anyLong(), anyCollection()))
+                .willReturn(List.of(groupAmount(10L, 90_000L)));
+        given(expenseParticipantRepository.sumOwedByUserPerGroup(anyLong(), anyCollection()))
+                .willReturn(List.of(groupAmount(10L, 30_000L), groupAmount(11L, 5_000L)));
+        given(settlementRepository.sumPaidOutByUserPerGroup(anyLong(), anyCollection()))
+                .willReturn(List.of(groupAmount(11L, 5_000L)));
+        given(settlementRepository.sumReceivedByUserPerGroup(anyLong(), anyCollection()))
+                .willReturn(List.of(groupAmount(10L, 60_000L)));
+
+        assertThat(balanceService.calculateUserBalanceInGroups(1L, List.of(10L, 11L)))
+                .containsExactlyInAnyOrderEntriesOf(Map.of(10L, 0L, 11L, 0L));
     }
 
     private void givenGroupExists() {

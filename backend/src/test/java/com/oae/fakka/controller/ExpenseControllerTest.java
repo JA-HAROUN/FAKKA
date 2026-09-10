@@ -222,8 +222,7 @@ class ExpenseControllerTest {
                                  "totalAmount":30000,"participantUserIds":[%d]}
                                 """.formatted(outsider.getId(), ahmed.getId())))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.message").value("Users [%d] are not members of this group, "
-                        .formatted(outsider.getId()) + "so they cannot pay for or share an expense"));
+                .andExpect(jsonPath("$.message").value("Users [%d] are not members of this group".formatted(outsider.getId())));
 
         assertThat(expenseRepository.count()).isZero();
     }
@@ -239,8 +238,7 @@ class ExpenseControllerTest {
                                  "totalAmount":30000,"participantUserIds":[%d,%d]}
                                 """.formatted(ahmed.getId(), ahmed.getId(), outsider.getId())))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.message").value("Users [%d] are not members of this group, "
-                        .formatted(outsider.getId()) + "so they cannot pay for or share an expense"));
+                .andExpect(jsonPath("$.message").value("Users [%d] are not members of this group".formatted(outsider.getId())));
     }
 
     /**
@@ -256,8 +254,7 @@ class ExpenseControllerTest {
                                  "totalAmount":30000,"participantUserIds":[%d,999999]}
                                 """.formatted(ahmed.getId(), ahmed.getId())))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.message").value("Users [999999] are not members of this group, "
-                        + "so they cannot pay for or share an expense"));
+                .andExpect(jsonPath("$.message").value("Users [999999] are not members of this group"));
     }
 
     /** The payer paying for people who ate without them is normal and must be allowed. */

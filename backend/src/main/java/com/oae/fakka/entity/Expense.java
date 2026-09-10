@@ -56,10 +56,14 @@ public class Expense {
     private Long groupId;
 
     /*
-     * Stored as a varchar, not the native MySQL enum type Hibernate would pick by default. That
-     * default bakes the category list into the column definition, and ddl-auto=update does not
-     * widen an existing enum -- so adding a category to FR-13 later would start failing inserts
-     * on a schema that looks up to date. A varchar takes a new constant with no migration.
+     * Stored as a varchar, not the native MySQL enum type Hibernate would pick by default: a
+     * portable column that any tool can read, rather than a type whose definition differs
+     * between real MySQL and the H2 the dev profile runs in.
+     *
+     * Note what this does NOT buy. Hibernate still generates a check constraint listing the
+     * seven values, and ddl-auto=update rewrites neither a check constraint nor an enum type, so
+     * adding a category to FR-13 needs a deliberate migration either way. The difference is that
+     * it is a constraint to drop and re-add rather than a column type to alter.
      */
     @Enumerated(EnumType.STRING)
     @JdbcTypeCode(SqlTypes.VARCHAR)

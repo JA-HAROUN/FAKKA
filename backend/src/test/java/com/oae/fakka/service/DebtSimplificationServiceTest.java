@@ -1,6 +1,6 @@
 package com.oae.fakka.service;
 
-import com.oae.fakka.dto.SettlementResponse;
+import com.oae.fakka.dto.SuggestedSettlementResponse;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -28,11 +28,11 @@ class DebtSimplificationServiceTest {
 
     @Test
     void twoPeopleSettleWithOnePayment() {
-        List<SettlementResponse> settlements = simplifier.simplify(Map.of(1L, 20_000L, 2L, -20_000L));
+        List<SuggestedSettlementResponse> settlements = simplifier.simplify(Map.of(1L, 20_000L, 2L, -20_000L));
 
         assertThat(settlements)
-                .extracting(SettlementResponse::fromUserId, SettlementResponse::toUserId,
-                        SettlementResponse::amount)
+                .extracting(SuggestedSettlementResponse::fromUserId, SuggestedSettlementResponse::toUserId,
+                        SuggestedSettlementResponse::amount)
                 .containsExactly(tuple(2L, 1L, 20_000L));
     }
 
@@ -44,11 +44,11 @@ class DebtSimplificationServiceTest {
         balances.put(2L, -20_000L);  // Ahmed owes 200
         balances.put(3L, -15_000L);  // Mohamed owes 150
 
-        List<SettlementResponse> settlements = simplifier.simplify(balances);
+        List<SuggestedSettlementResponse> settlements = simplifier.simplify(balances);
 
         assertThat(settlements)
-                .extracting(SettlementResponse::fromUserId, SettlementResponse::toUserId,
-                        SettlementResponse::amount)
+                .extracting(SuggestedSettlementResponse::fromUserId, SuggestedSettlementResponse::toUserId,
+                        SuggestedSettlementResponse::amount)
                 .containsExactly(
                         tuple(2L, 1L, 20_000L),
                         tuple(3L, 1L, 15_000L));
@@ -62,8 +62,8 @@ class DebtSimplificationServiceTest {
         balances.put(3L, -15_000L);
 
         assertThat(simplifier.simplify(balances))
-                .extracting(SettlementResponse::fromUserId, SettlementResponse::toUserId,
-                        SettlementResponse::amount)
+                .extracting(SuggestedSettlementResponse::fromUserId, SuggestedSettlementResponse::toUserId,
+                        SuggestedSettlementResponse::amount)
                 .containsExactly(
                         tuple(3L, 1L, 10_000L),
                         tuple(3L, 2L, 5_000L));
@@ -83,8 +83,8 @@ class DebtSimplificationServiceTest {
         balances.put(4L, -30_000L);
 
         assertThat(simplifier.simplify(balances))
-                .extracting(SettlementResponse::fromUserId, SettlementResponse::toUserId,
-                        SettlementResponse::amount)
+                .extracting(SuggestedSettlementResponse::fromUserId, SuggestedSettlementResponse::toUserId,
+                        SuggestedSettlementResponse::amount)
                 .containsExactly(
                         tuple(3L, 1L, 50_000L),
                         tuple(4L, 2L, 30_000L),
@@ -101,8 +101,8 @@ class DebtSimplificationServiceTest {
         balances.put(3L, -10_000L);
 
         assertThat(simplifier.simplify(balances))
-                .extracting(SettlementResponse::fromUserId, SettlementResponse::toUserId,
-                        SettlementResponse::amount)
+                .extracting(SuggestedSettlementResponse::fromUserId, SuggestedSettlementResponse::toUserId,
+                        SuggestedSettlementResponse::amount)
                 .containsExactly(tuple(3L, 1L, 10_000L));
     }
 
@@ -165,7 +165,7 @@ class DebtSimplificationServiceTest {
         balances.put(5L, -10_000L);
 
         assertThat(simplifier.simplify(balances))
-                .extracting(SettlementResponse::fromUserId, SettlementResponse::toUserId)
+                .extracting(SuggestedSettlementResponse::fromUserId, SuggestedSettlementResponse::toUserId)
                 .containsExactly(tuple(5L, 3L), tuple(9L, 7L));
     }
 
@@ -191,7 +191,7 @@ class DebtSimplificationServiceTest {
         balances.put(2L, -33L);
         balances.put(3L, -33L);
 
-        List<SettlementResponse> settlements = simplifier.simplify(balances);
+        List<SuggestedSettlementResponse> settlements = simplifier.simplify(balances);
 
         assertThat(settlements).hasSize(2);
         assertThat(totalTransferred(settlements)).isEqualTo(66L);
@@ -206,11 +206,11 @@ class DebtSimplificationServiceTest {
      */
     @Test
     void aBalanceMapThatDoesNotSumToZeroIsSettledAsFarAsItCanBe() {
-        List<SettlementResponse> settlements = simplifier.simplify(Map.of(1L, 10_000L, 2L, -5_000L));
+        List<SuggestedSettlementResponse> settlements = simplifier.simplify(Map.of(1L, 10_000L, 2L, -5_000L));
 
         assertThat(settlements)
-                .extracting(SettlementResponse::fromUserId, SettlementResponse::toUserId,
-                        SettlementResponse::amount)
+                .extracting(SuggestedSettlementResponse::fromUserId, SuggestedSettlementResponse::toUserId,
+                        SuggestedSettlementResponse::amount)
                 .containsExactly(tuple(2L, 1L, 5_000L));
     }
 
@@ -226,7 +226,7 @@ class DebtSimplificationServiceTest {
         for (int round = 0; round < 40; round++) {
             Map<Long, Long> balances = balancesSummingToZero(memberCount, random);
 
-            List<SettlementResponse> settlements = simplifier.simplify(balances);
+            List<SuggestedSettlementResponse> settlements = simplifier.simplify(balances);
 
             assertThat(applyTo(balances, settlements).values())
                     .as("every balance cleared for %s", balances)
@@ -249,7 +249,7 @@ class DebtSimplificationServiceTest {
         balances.put(3L, -25_000L);
         balances.put(4L, -35_000L);
 
-        List<SettlementResponse> settlements = simplifier.simplify(balances);
+        List<SuggestedSettlementResponse> settlements = simplifier.simplify(balances);
 
         Map<Long, Long> paidOut = new LinkedHashMap<>();
         settlements.forEach(settlement ->
@@ -275,17 +275,17 @@ class DebtSimplificationServiceTest {
 
     /** The balances left after the suggested payments are made. */
     private static Map<Long, Long> applyTo(
-            Map<Long, Long> balances, List<SettlementResponse> settlements) {
+            Map<Long, Long> balances, List<SuggestedSettlementResponse> settlements) {
 
         Map<Long, Long> remaining = new LinkedHashMap<>(balances);
-        for (SettlementResponse settlement : settlements) {
+        for (SuggestedSettlementResponse settlement : settlements) {
             remaining.merge(settlement.fromUserId(), settlement.amount(), Long::sum);
             remaining.merge(settlement.toUserId(), -settlement.amount(), Long::sum);
         }
         return remaining;
     }
 
-    private static long totalTransferred(List<SettlementResponse> settlements) {
-        return settlements.stream().mapToLong(SettlementResponse::amount).sum();
+    private static long totalTransferred(List<SuggestedSettlementResponse> settlements) {
+        return settlements.stream().mapToLong(SuggestedSettlementResponse::amount).sum();
     }
 }

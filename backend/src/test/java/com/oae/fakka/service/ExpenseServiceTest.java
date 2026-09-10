@@ -116,8 +116,7 @@ class ExpenseServiceTest {
         assertThatThrownBy(() -> expenseService.createExpense(
                 GROUP_ID, request(SplitType.EQUAL, 1L, List.of(2L, 3L), 35_000L, Map.of())))
                 .isInstanceOf(NonGroupMemberException.class)
-                .hasMessage("Users [1] are not members of this group, "
-                        + "so they cannot pay for or share an expense");
+                .hasMessage("Users [1] are not members of this group");
 
         verifyNoInteractions(expenseSplitService, expenseRepository, expenseParticipantRepository);
     }

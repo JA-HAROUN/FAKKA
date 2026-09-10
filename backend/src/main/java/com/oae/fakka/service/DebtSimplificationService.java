@@ -1,6 +1,6 @@
 package com.oae.fakka.service;
 
-import com.oae.fakka.dto.SettlementResponse;
+import com.oae.fakka.dto.SuggestedSettlementResponse;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
@@ -56,7 +56,7 @@ public class DebtSimplificationService {
      * @return one transfer per step, largest first by construction. Empty when everyone is
      *         already settled.
      */
-    public List<SettlementResponse> simplify(Map<Long, Long> balancesInPiastres) {
+    public List<SuggestedSettlementResponse> simplify(Map<Long, Long> balancesInPiastres) {
         PriorityQueue<Party> creditors = new PriorityQueue<>(LARGEST_FIRST);
         PriorityQueue<Party> debtors = new PriorityQueue<>(LARGEST_FIRST);
 
@@ -69,7 +69,7 @@ public class DebtSimplificationService {
             }
         });
 
-        List<SettlementResponse> settlements = new ArrayList<>();
+        List<SuggestedSettlementResponse> settlements = new ArrayList<>();
 
         /*
          * Stops when either side runs out. For balances that sum to zero -- which is every real
@@ -82,7 +82,7 @@ public class DebtSimplificationService {
             Party debtor = debtors.poll();
 
             long amount = Math.min(creditor.amount(), debtor.amount());
-            settlements.add(new SettlementResponse(debtor.userId(), creditor.userId(), amount));
+            settlements.add(new SuggestedSettlementResponse(debtor.userId(), creditor.userId(), amount));
 
             long creditRemaining = creditor.amount() - amount;
             long debtRemaining = debtor.amount() - amount;
