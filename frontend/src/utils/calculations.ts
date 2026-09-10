@@ -2,8 +2,13 @@ import type { Expense, PurchasedItem, Settlement } from "@/types";
 
 export const CURRENCY = "EGP";
 
+function finiteAmount(value: number): number {
+  return Number.isFinite(value) ? value : 0;
+}
+
 export function round2(n: number): number {
-  return Math.round((n + Number.EPSILON) * 100) / 100;
+  const value = finiteAmount(n);
+  return Math.round((value + Number.EPSILON) * 100) / 100;
 }
 
 export function formatAmount(n: number): string {
@@ -81,16 +86,17 @@ export function groupBalances(
   memberIds.forEach((id) => (balances[id] = 0));
 
   for (const e of expenses) {
-    balances[e.paidBy] = round2((balances[e.paidBy] ?? 0) + e.totalAmount);
+    balances[e.paidBy] = round2((balances[e.paidBy] ?? 0) + finiteAmount(e.totalAmount));
     for (const [uid, amount] of Object.entries(e.shares)) {
-      balances[uid] = round2((balances[uid] ?? 0) - amount);
+      balances[uid] = round2((balances[uid] ?? 0) - finiteAmount(amount));
     }
   }
 
   for (const s of settlements) {
     if (s.status !== "paid") continue;
-    balances[s.fromUser] = round2((balances[s.fromUser] ?? 0) + s.amount);
-    balances[s.toUser] = round2((balances[s.toUser] ?? 0) - s.amount);
+    const amount = finiteAmount(s.amount);
+    balances[s.fromUser] = round2((balances[s.fromUser] ?? 0) + amount);
+    balances[s.toUser] = round2((balances[s.toUser] ?? 0) - amount);
   }
 
   return balances;

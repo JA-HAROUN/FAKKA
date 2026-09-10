@@ -1,6 +1,9 @@
 import type { CategoryId, Expense, ExpenseDraft, Group, Settlement, User } from "@/types";
 
-const API_BASE_URL = (import.meta.env["VITE_API_URL"] ?? "http://localhost:8080").replace(/\/$/, "");
+const API_BASE_URL = (import.meta.env["VITE_API_URL"] ?? "http://localhost:8080").replace(
+  /\/$/,
+  "",
+);
 
 interface BackendUser {
   id: number;
@@ -34,7 +37,7 @@ interface BackendMember {
 
 interface BackendShare {
   userId: number;
-  amount: number;
+  shareAmount: number;
 }
 
 interface BackendExpense {
@@ -165,7 +168,7 @@ function toExpense(expense: BackendExpense): Expense {
     participants: expense.participants.map((share) => String(share.userId)),
     splitType: "custom",
     shares: Object.fromEntries(
-      expense.participants.map((share) => [String(share.userId), share.amount / 100]),
+      expense.participants.map((share) => [String(share.userId), share.shareAmount / 100]),
     ),
     createdAt: expense.createdAt,
     ...(expense.imageUrl ? { image: expense.imageUrl } : {}),
@@ -231,7 +234,10 @@ export const api = {
     const isEmail = query.includes("@");
     return request<BackendMember>("/api/friends", {
       method: "POST",
-      body: JSON.stringify({ userId: Number(userId), ...(isEmail ? { email: query } : { username: query }) }),
+      body: JSON.stringify({
+        userId: Number(userId),
+        ...(isEmail ? { email: query } : { username: query }),
+      }),
     }).then(toUser);
   },
 
@@ -244,7 +250,10 @@ export const api = {
         imageUrl: input.image.startsWith("http") ? input.image : null,
         memberUserIds: input.memberIds.filter((id) => id !== userId).map(Number),
       }),
-    }).then((group) => ({ ...toGroup(group), members: [userId, ...input.memberIds.filter((id) => id !== userId)] }));
+    }).then((group) => ({
+      ...toGroup(group),
+      members: [userId, ...input.memberIds.filter((id) => id !== userId)],
+    }));
   },
 
   createExpense(groupId: string, draft: ExpenseDraft) {
@@ -317,10 +326,12 @@ export const api = {
   },
 
   exportGroup(groupId: string) {
-    return fetch(`${API_BASE_URL}/api/groups/${groupId}/export?format=csv`).then(async (response) => {
-      if (!response.ok) throw new ApiError(response.status, "Could not export this report");
-      return response.blob();
-    });
+    return fetch(`${API_BASE_URL}/api/groups/${groupId}/export?format=csv`).then(
+      async (response) => {
+        if (!response.ok) throw new ApiError(response.status, "Could not export this report");
+        return response.blob();
+      },
+    );
   },
 };
 

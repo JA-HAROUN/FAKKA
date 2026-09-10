@@ -1,16 +1,14 @@
 package com.oae.fakka.service;
 
-import com.fasterxml.jackson.core.JacksonException;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.oae.fakka.config.OcrProperties;
-import com.oae.fakka.dto.OcrReceiptItem;
-import com.oae.fakka.dto.ParsedReceiptResponse;
-import com.oae.fakka.exception.AiResponseNotUsableException;
-import com.oae.fakka.exception.ApiException;
-import com.oae.fakka.exception.OcrUnavailableException;
-import com.oae.fakka.exception.ResourceNotFoundException;
-import com.oae.fakka.repository.GroupRepository;
-import lombok.extern.slf4j.Slf4j;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.util.ArrayList;
+import java.util.Base64;
+import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+import org.springframework.http.MediaType;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -20,39 +18,57 @@ import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.math.BigDecimal;
-import java.math.RoundingMode;
-import java.util.ArrayList;
-import java.util.Base64;
-import java.util.List;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
+import com.fasterxml.jackson.core.JacksonException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.oae.fakka.config.OcrProperties;
+import com.oae.fakka.dto.OcrReceiptItem;
+import com.oae.fakka.dto.ParsedReceiptResponse;
+import com.oae.fakka.exception.AiResponseNotUsableException;
+import com.oae.fakka.exception.AiUnavailableException;
+import com.oae.fakka.exception.ApiException;
+import com.oae.fakka.exception.OcrUnavailableException;
+import com.oae.fakka.exception.ResourceNotFoundException;
+import com.oae.fakka.repository.GroupRepository;
+
+import lombok.extern.slf4j.Slf4j;
 
 /**
- * Sends a receipt image to OCR.space and extracts line items for the purchased-items UI
+ * Sends a receipt image to OCR.space and extracts line items for the
+ * purchased-items UI
  * (FR-24 to FR-28).
  *
  * <h2>It cannot write, by construction</h2>
- * The only repository injected is the one used to confirm the group exists. There is no expense
- * repository here, so this class could not persist an expense if somebody asked it to -- which is
- * what BR-6 needs: an OCR result pre-fills the form, and an expense exists only when the user
- * confirms it through {@code POST /api/groups/{groupId}/expenses}. The transaction is
+ * The only repository injected is the one used to confirm the group exists.
+ * There is no expense
+ * repository here, so this class could not persist an expense if somebody asked
+ * it to -- which is
+ * what BR-6 needs: an OCR result pre-fills the form, and an expense exists only
+ * when the user
+ * confirms it through {@code POST /api/groups/{groupId}/expenses}. The
+ * transaction is
  * {@code readOnly} as a second statement of the same thing.
  *
  * <h2>The OCR service extracts text; this class decides</h2>
- * A clean division, and it is deliberate. OCR.space turns pixels into characters, which is what
- * it is good at. Everything with a right answer stays here: detecting line items in the raw text,
- * converting EGP to piastres, and deciding whether what came back is usable at all.
+ * A clean division, and it is deliberate. OCR.space turns pixels into
+ * characters, which is what
+ * it is good at. Everything with a right answer stays here: detecting line
+ * items in the raw text,
+ * converting EGP to piastres, and deciding whether what came back is usable at
+ * all.
  *
  * <h2>Failure is a first-class outcome (BR-7, FR-28)</h2>
  * Three shapes of failure, three answers, none of them a 500:
  * <ul>
- *   <li>Not configured, unreachable, timed out, or errored: {@link AiUnavailableException},
- *       a 503 with "enter items manually instead".</li>
- *   <li>Reached but returned nothing parseable: {@link AiResponseNotUsableException}, a 422.</li>
- *   <li>Anything unforeseen: caught at the end of {@link #parse} and reported as the 503,
- *       because an unhandled 500 would tell the client nothing about what to do and the answer
- *       is always the same -- offer the manual item-entry form.</li>
+ * <li>Not configured, unreachable, timed out, or errored:
+ * {@link AiUnavailableException},
+ * a 503 with "enter items manually instead".</li>
+ * <li>Reached but returned nothing parseable:
+ * {@link AiResponseNotUsableException}, a 422.</li>
+ * <li>Anything unforeseen: caught at the end of {@link #parse} and reported as
+ * the 503,
+ * because an unhandled 500 would tell the client nothing about what to do and
+ * the answer
+ * is always the same -- offer the manual item-entry form.</li>
  * </ul>
  */
 @Slf4j
@@ -67,12 +83,15 @@ public class ReceiptOcrService {
      * <p>
      * Groups (all optional except the name):
      * <ol>
-     *   <li>Item name — one or more word characters and spaces (required)</li>
-     *   <li>Quantity prefix — a number followed by {@code x} or {@code ×} (optional)</li>
-     *   <li>Price — a decimal number, optionally prefixed by {@code EGP} / {@code LE} /
-     *       currency symbols (required to treat the line as an item)</li>
+     * <li>Item name — one or more word characters and spaces (required)</li>
+     * <li>Quantity prefix — a number followed by {@code x} or {@code ×}
+     * (optional)</li>
+     * <li>Price — a decimal number, optionally prefixed by {@code EGP} / {@code LE}
+     * /
+     * currency symbols (required to treat the line as an item)</li>
      * </ol>
      * Examples matched:
+     * 
      * <pre>
      *   Pizza                   35.00
      *   Burger x1               20.50
@@ -88,16 +107,19 @@ public class ReceiptOcrService {
             Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CHARACTER_CLASS);
 
     /**
-     * Matches a total line. Used to read {@code suggestedTotalPiastres} independently of items.
+     * Matches a total line. Used to read {@code suggestedTotalPiastres}
+     * independently of items.
      * <p>
-     * Examples matched: {@code Total 85.00}, {@code TOTAL EGP 850}, {@code Grand Total: 1200}.
+     * Examples matched: {@code Total 85.00}, {@code TOTAL EGP 850},
+     * {@code Grand Total: 1200}.
      */
     private static final Pattern TOTAL_LINE = Pattern.compile(
             "(?i)\\b(?:grand\\s+)?total[:\\s]+(?:EGP|LE|L\\.E\\.|£|\\$)?\\s*"
                     + "(?<price>\\d{1,7}(?:[.,]\\d{1,2})?)");
 
     /**
-     * Words that look like item names but are receipt boilerplate. Lines whose trimmed text
+     * Words that look like item names but are receipt boilerplate. Lines whose
+     * trimmed text
      * matches any of these are skipped before the item regex is applied.
      */
     private static final List<String> BOILERPLATE_PATTERNS = List.of(
@@ -114,7 +136,7 @@ public class ReceiptOcrService {
             "(?i)^receipt\\b.*",
             "(?i)^order\\s*#?\\s*\\d+.*",
             "(?i)^table\\s*#?\\s*\\d+.*",
-            "(?i)^\\d{1,2}[/\\-.]\\d{1,2}[/\\-.]\\d{2,4}.*"   // dates
+            "(?i)^\\d{1,2}[/\\-.]\\d{1,2}[/\\-.]\\d{2,4}.*" // dates
     );
 
     private static final int MAX_ITEMS = 50;
@@ -124,7 +146,8 @@ public class ReceiptOcrService {
     private final RestClient restClient;
 
     /*
-     * Same reasoning as NaturalLanguageExpenseService: a plain ObjectMapper is cheap, stateless,
+     * Same reasoning as NaturalLanguageExpenseService: a plain ObjectMapper is
+     * cheap, stateless,
      * and needs no shared configuration with the HTTP message converters.
      */
     private final ObjectMapper objectMapper = new ObjectMapper();
@@ -146,12 +169,14 @@ public class ReceiptOcrService {
     /**
      * Parses the image into a receipt item list. Writes nothing, ever.
      * <p>
-     * The unknown-group 404 and the unavailable-service 503 both happen before the image is sent,
+     * The unknown-group 404 and the unavailable-service 503 both happen before the
+     * image is sent,
      * so a misconfigured deployment or a bad id costs nothing.
      *
      * @param groupId the group this receipt would belong to (existence check only)
      * @param image   the uploaded image file
-     * @return a response with the extracted items and suggested total, ready for the UI to pre-fill
+     * @return a response with the extracted items and suggested total, ready for
+     *         the UI to pre-fill
      */
     @Transactional(readOnly = true)
     public ParsedReceiptResponse parse(Long groupId, MultipartFile image) {
@@ -166,12 +191,14 @@ public class ReceiptOcrService {
             String rawText = callOcrSpaceForTest(image);
             return extractItems(rawText);
         } catch (ApiException deliberate) {
-            // Already the right status with the right message; passing it through is the point.
+            // Already the right status with the right message; passing it through is the
+            // point.
             throw deliberate;
         } catch (Exception unexpected) {
             /*
              * The BR-7 / FR-28 backstop. Whatever went wrong -- a bug here, something a
-             * dependency threw that was not anticipated -- the caller gets the one answer that
+             * dependency threw that was not anticipated -- the caller gets the one answer
+             * that
              * helps, and the detail goes to the log where it can be fixed.
              */
             log.error("Unexpected failure parsing receipt for group id={}", groupId, unexpected);
@@ -181,7 +208,8 @@ public class ReceiptOcrService {
 
     /**
      * Protected hook so tests can override the HTTP call without a network.
-     * Production code reaches here and delegates to the private {@link #callOcrSpace}.
+     * Production code reaches here and delegates to the private
+     * {@link #callOcrSpace}.
      */
     protected String callOcrSpaceForTest(MultipartFile image) {
         return callOcrSpace(image);
@@ -195,8 +223,10 @@ public class ReceiptOcrService {
      * Encodes the image as base64 and submits it to OCR.space.
      *
      * @return the raw text OCR.space extracted from the image
-     * @throws AiUnavailableException   if the service cannot be reached or returns an error
-     * @throws AiResponseNotUsableException if the service replied but extracted no text
+     * @throws AiUnavailableException       if the service cannot be reached or
+     *                                      returns an error
+     * @throws AiResponseNotUsableException if the service replied but extracted no
+     *                                      text
      */
     private String callOcrSpace(MultipartFile image) {
         byte[] imageBytes;
@@ -218,13 +248,14 @@ public class ReceiptOcrService {
         formData.add("isOverlayRequired", "false");
         formData.add("detectOrientation", "true");
         formData.add("scale", "true");
-        formData.add("OCREngine", "2");   // engine 2 handles printed receipts better
+        formData.add("OCREngine", "2"); // engine 2 handles printed receipts better
 
         String responseBody;
         try {
             responseBody = restClient.post()
                     .uri(PARSE_IMAGE_PATH)
                     .header("apikey", ocrProperties.apiKey())
+                    .contentType(MediaType.APPLICATION_FORM_URLENCODED)
                     .body(formData)
                     .retrieve()
                     .body(String.class);
@@ -285,8 +316,10 @@ public class ReceiptOcrService {
     /**
      * Scans the raw OCR text line by line and extracts item rows.
      * <p>
-     * Returns a response with the items found and the receipt total if one was printed. A result
-     * with an empty item list is a valid success -- the caller shows the manual entry form.
+     * Returns a response with the items found and the receipt total if one was
+     * printed. A result
+     * with an empty item list is a valid success -- the caller shows the manual
+     * entry form.
      */
     private ParsedReceiptResponse extractItems(String rawText) {
         String[] lines = rawText.split("\\r?\\n");
@@ -335,7 +368,10 @@ public class ReceiptOcrService {
         return new ParsedReceiptResponse(List.copyOf(items), suggestedTotalPiastres);
     }
 
-    /** Whether the line is receipt boilerplate that should not be treated as a purchased item. */
+    /**
+     * Whether the line is receipt boilerplate that should not be treated as a
+     * purchased item.
+     */
     private static boolean isBoilerplate(String line) {
         for (String pattern : BOILERPLATE_PATTERNS) {
             if (line.matches(pattern)) {
@@ -346,7 +382,8 @@ public class ReceiptOcrService {
     }
 
     /**
-     * Parses a quantity string (e.g. {@code "2"}) to an int, defaulting to 1 when absent.
+     * Parses a quantity string (e.g. {@code "2"}) to an int, defaulting to 1 when
+     * absent.
      * A value of zero is also treated as 1.
      */
     private static int parseQuantity(String qtyGroup) {
@@ -364,9 +401,12 @@ public class ReceiptOcrService {
     /**
      * Parses a price string from OCR text into piastres.
      * <p>
-     * Commas are treated as thousands separators (e.g. {@code "1,200.50"} → 1 200.50 EGP). A
-     * single comma with exactly two digits after it is treated as a decimal separator instead
-     * (European style: {@code "12,50"} → 12.50 EGP). Rounded to the nearest piastre.
+     * Commas are treated as thousands separators (e.g. {@code "1,200.50"} → 1
+     * 200.50 EGP). A
+     * single comma with exactly two digits after it is treated as a decimal
+     * separator instead
+     * (European style: {@code "12,50"} → 12.50 EGP). Rounded to the nearest
+     * piastre.
      *
      * @param priceText the raw price string from the regex match
      * @param fallback  returned when the string cannot be parsed
