@@ -15,6 +15,7 @@ import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.servlet.NoHandlerFoundException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import java.time.Instant;
@@ -88,10 +89,17 @@ public class GlobalExceptionHandler {
                 "Parameter '%s' has an invalid value".formatted(exception.getName()), request);
     }
 
-    /** No handler matched the URL — keeps 404s in the same shape as everything else. */
-    @ExceptionHandler(NoResourceFoundException.class)
-    public ResponseEntity<ErrorResponse> handleNoResourceFound(
-            NoResourceFoundException exception, HttpServletRequest request) {
+    /**
+     * No handler matched the URL — keeps 404s in the same shape as everything else.
+     * <p>
+     * Both types are needed: DispatcherServlet raises NoHandlerFoundException when no
+     * mapping matches, while NoResourceFoundException comes from the static-resource
+     * handler. Handling only one of them lets the other fall through to the catch-all
+     * below and return 500 for a plain unknown path.
+     */
+    @ExceptionHandler({NoHandlerFoundException.class, NoResourceFoundException.class})
+    public ResponseEntity<ErrorResponse> handleNotFound(
+            Exception exception, HttpServletRequest request) {
         return build(HttpStatus.NOT_FOUND, "No endpoint matched this request", request);
     }
 
