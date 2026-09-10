@@ -149,7 +149,7 @@ export function ManualExpenseForm({
             {members.map((member) => (
               <SelectItem key={member.id} value={member.id}>
                 <span aria-hidden>{member.avatar}</span>
-                {member.name}
+                {/* {member.name} */}
               </SelectItem>
             ))}
           </SelectContent>
@@ -230,7 +230,7 @@ export function ManualExpenseForm({
                         {member.avatar}
                       </span>
                       <span className="min-w-0 flex-1 truncate text-body font-semibold">
-                        {member.name}
+                        {/* {member.name} */}
                       </span>
                       {checked && (
                         <span className="text-body font-semibold tabular-nums">

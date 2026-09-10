@@ -1,5 +1,6 @@
 package com.oae.fakka.config;
 
+import java.net.URI;
 import java.time.Duration;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
@@ -64,8 +65,24 @@ public record AiProperties(
      */
     public AiProperties {
         apiKey = apiKey == null ? "" : apiKey.trim();
-        baseUrl = isBlank(baseUrl) ? DEFAULT_BASE_URL : baseUrl.trim();
-        model = isBlank(model) ? DEFAULT_MODEL : model.trim();
+        String configuredBaseUrl = isBlank(baseUrl) ? DEFAULT_BASE_URL : baseUrl.trim();
+        String configuredModel = isBlank(model) ? DEFAULT_MODEL : model.trim();
+        URI endpoint = URI.create(configuredBaseUrl);
+        String path = endpoint.getPath();
+        String modelPrefix = "/v1beta/models/";
+        String modelSuffix = ":generateContent";
+        if (path != null && path.startsWith(modelPrefix) && path.endsWith(modelSuffix)) {
+            String endpointModel = path.substring(
+                    modelPrefix.length(), path.length() - modelSuffix.length());
+            if (isBlank(model)) {
+                configuredModel = endpointModel;
+            }
+            configuredBaseUrl = endpoint.getScheme() + "://" + endpoint.getAuthority();
+        } else if (path != null && !path.isBlank() && !"/".equals(path)) {
+            configuredBaseUrl = endpoint.getScheme() + "://" + endpoint.getAuthority();
+        }
+        baseUrl = configuredBaseUrl;
+        model = configuredModel;
         maxTokens = maxTokens <= 0 ? DEFAULT_MAX_TOKENS : maxTokens;
         effort = isBlank(effort) ? DEFAULT_EFFORT : effort.trim();
         timeout = timeout == null || timeout.isZero() || timeout.isNegative()
