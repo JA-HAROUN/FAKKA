@@ -1,41 +1,40 @@
-import { useState } from "react";
-import { Download, FileSpreadsheet, FileText } from "lucide-react";
-import { toast } from "sonner";
+import { Money } from "@/components/common/Money";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
 } from "@/components/ui/dialog";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
 } from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
-import { Money } from "@/components/common/Money";
-import type { Group } from "@/types";
 import { useApp } from "@/context/AppContext";
-import { buildReportCsv, downloadCsv } from "@/utils/exportCsv";
+import type { Group } from "@/types";
 import { groupBalances, groupTotal, simplifyDebts } from "@/utils/calculations";
-import { formatShortDate, pluralize } from "@/utils/format";
 import { getCategory } from "@/utils/categories";
+import { formatShortDate, pluralize } from "@/utils/format";
+import { Download, FileSpreadsheet, FileText } from "lucide-react";
+import { useState } from "react";
+import { toast } from "sonner";
 
 /** Group report: preview on screen, or download the CSV the report is built from. */
 export function ExportButton({ group }: { group: Group }) {
-  const { users, userById, expensesOfGroup, settlementsOfGroup } = useApp();
+  const { userById, expensesOfGroup, settlementsOfGroup, exportGroup } = useApp();
   const [open, setOpen] = useState(false);
   const expenses = expensesOfGroup(group.id);
   const settlements = settlementsOfGroup(group.id);
@@ -43,10 +42,19 @@ export function ExportButton({ group }: { group: Group }) {
   const pending = simplifyDebts(balances);
   const paid = settlements.filter((s) => s.status === "paid");
 
-  function exportCsvNow() {
-    const csv = buildReportCsv({ group, users, expenses, settlements });
-    downloadCsv(`fakka-${group.name.toLowerCase().replace(/\s+/g, "-")}.csv`, csv);
-    toast.success("CSV report downloaded");
+  async function exportCsvNow() {
+    try {
+      const blob = await exportGroup(group.id);
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = `fakka-${group.name.toLowerCase().replace(/\s+/g, "-")}.csv`;
+      anchor.click();
+      URL.revokeObjectURL(url);
+      toast.success("CSV report downloaded");
+    } catch (cause) {
+      toast.error(cause instanceof Error ? cause.message : "Could not export this report");
+    }
   }
 
   return (

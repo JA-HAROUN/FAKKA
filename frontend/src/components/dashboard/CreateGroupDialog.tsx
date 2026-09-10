@@ -1,17 +1,17 @@
-import { useState } from "react";
-import { Link, useNavigate } from "@tanstack/react-router";
-import { Plus } from "lucide-react";
-import { toast } from "sonner";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Field, FormError } from "@/components/common/Field";
 import { ResponsiveModal } from "@/components/common/ResponsiveModal";
 import { UserAvatar } from "@/components/common/UserAvatar";
+import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { useApp } from "@/context/AppContext";
 import { cn } from "@/lib/utils";
 import { pluralize } from "@/utils/format";
+import { Link, useNavigate } from "@tanstack/react-router";
+import { Plus } from "lucide-react";
+import { useState } from "react";
+import { toast } from "sonner";
 
 const EMOJIS = ["🍝", "🐫", "🏠", "✈️", "🎉", "🏖️", "☕", "🎬", "🛒", "⚽", "🎓", "🚗"] as const;
 
@@ -31,14 +31,14 @@ export function CreateGroupDialog() {
     setErrors({});
   }
 
-  function submit() {
+  async function submit() {
     const next: typeof errors = {};
     if (!name.trim()) next.name = "Give your group a name.";
     if (selected.length === 0) next.members = "Pick at least one friend to split with.";
     setErrors(next);
     if (Object.keys(next).length > 0) return;
 
-    const group = createGroup({
+    const group = await createGroup({
       name: name.trim(),
       image,
       memberIds: [currentUser!.id, ...selected],

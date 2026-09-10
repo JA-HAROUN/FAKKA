@@ -1,23 +1,25 @@
-import { ImagePlus, Trash2 } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Checkbox } from "@/components/ui/checkbox";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Field, FormError } from "@/components/common/Field";
 import { Money } from "@/components/common/Money";
-import type { CategoryId, ExpenseDraft, User } from "@/types";
-import { CATEGORIES } from "@/utils/categories";
-import { CURRENCY, equalShares, formatAmount, round2 } from "@/utils/calculations";
-import { formatNumber, pluralize } from "@/utils/format";
-import { ReceiptItemsField } from "./ReceiptItemsField";
+import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select";
+import { useApp } from "@/context/AppContext";
 import { cn } from "@/lib/utils";
+import type { CategoryId, ExpenseDraft, User } from "@/types";
+import { CURRENCY, equalShares, formatAmount, round2 } from "@/utils/calculations";
+import { CATEGORIES } from "@/utils/categories";
+import { formatNumber, pluralize } from "@/utils/format";
+import { ImagePlus, Loader2, Trash2 } from "lucide-react";
+import { useState } from "react";
+import { ReceiptItemsField } from "./ReceiptItemsField";
 
 export function customSplitError(draft: ExpenseDraft): string | null {
   if (draft.splitType !== "custom") return null;
@@ -42,18 +44,22 @@ const SPLIT_OPTIONS = [
 ] as const;
 
 export function ManualExpenseForm({
+  groupId,
   members,
   draft,
   setDraft,
   onContinue,
   error,
 }: {
+  groupId: string;
   members: User[];
   draft: ExpenseDraft;
   setDraft: (d: ExpenseDraft) => void;
   onContinue: () => void;
   error: string | null;
 }) {
+  const { parseReceipt } = useApp();
+  const [ocrLoading, setOcrLoading] = useState(false);
   const update = (patch: Partial<ExpenseDraft>) => {
     const next = { ...draft, ...patch };
     if (next.splitType === "equal") next.shares = equalShares(next.totalAmount, next.participants);
@@ -341,8 +347,8 @@ export function ManualExpenseForm({
             htmlFor="receipt-image"
             className="row-hover flex cursor-pointer items-center gap-2.5 rounded-lg border border-dashed border-border px-3 py-3 text-label font-normal text-muted-foreground"
           >
-            <ImagePlus className="size-4" aria-hidden />
-            Attach a photo of the bill
+            {ocrLoading ? <Loader2 className="size-4 animate-spin" aria-hidden /> : <ImagePlus className="size-4" aria-hidden />}
+            {ocrLoading ? "Reading receipt…" : "Attach a photo of the bill"}
           </Label>
         )}
         <input
@@ -352,7 +358,26 @@ export function ManualExpenseForm({
           className="hidden"
           onChange={(e) => {
             const file = e.target.files?.[0];
-            if (file) update({ image: URL.createObjectURL(file) });
+            if (!file) return;
+            update({ image: URL.createObjectURL(file) });
+            setOcrLoading(true);
+            void parseReceipt(groupId, file)
+              .then((receipt) => {
+                const items = receipt.items.map((item, index) => ({
+                  id: `ocr-${index}`,
+                  name: item.name,
+                  quantity: item.quantity,
+                  price: item.unitPricePiastres / 100,
+                  assignedTo: [],
+                }));
+                const next = { ...draft, items };
+                if (receipt.suggestedTotalPiastres > 0) next.totalAmount = receipt.suggestedTotalPiastres / 100;
+                setDraft(next);
+              })
+              .catch(() => {
+                // The manual item editor remains available when OCR is unavailable.
+              })
+              .finally(() => setOcrLoading(false));
           }}
         />
       </div>

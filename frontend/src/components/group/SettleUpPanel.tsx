@@ -1,25 +1,25 @@
-import { useState } from "react";
-import { ArrowRight, CheckCircle2, Handshake } from "lucide-react";
-import { toast } from "sonner";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/common/EmptyState";
 import { Money } from "@/components/common/Money";
 import { Panel, PanelList, Section } from "@/components/common/Section";
-import type { Group, Settlement } from "@/types";
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { useApp } from "@/context/AppContext";
+import type { Group, Settlement } from "@/types";
 import { formatAmount, type SimplifiedDebt } from "@/utils/calculations";
 import { formatRelativeDate } from "@/utils/format";
+import { ArrowRight, CheckCircle2, Handshake } from "lucide-react";
+import { useState } from "react";
+import { toast } from "sonner";
 
 /**
  * The settlement plan: the fewest transfers that clear the group, phrased from
@@ -44,17 +44,21 @@ export function SettleUpPanel({
     .filter((s) => s.status === "paid")
     .sort((a, b) => (b.paidAt ?? "").localeCompare(a.paidAt ?? ""));
 
-  function confirmPayment(debt: SimplifiedDebt) {
-    markSettlementPaid({
-      groupId: group.id,
-      fromUser: debt.fromUser,
-      toUser: debt.toUser,
-      amount: debt.amount,
-    });
-    setConfirming(null);
-    toast.success("Payment recorded", {
-      description: `${userById(debt.fromUser).name} → ${userById(debt.toUser).name} · ${formatAmount(debt.amount)}`,
-    });
+  async function confirmPayment(debt: SimplifiedDebt) {
+    try {
+      await markSettlementPaid({
+        groupId: group.id,
+        fromUser: debt.fromUser,
+        toUser: debt.toUser,
+        amount: debt.amount,
+      });
+      setConfirming(null);
+      toast.success("Payment recorded", {
+        description: `${userById(debt.fromUser).name} → ${userById(debt.toUser).name} · ${formatAmount(debt.amount)}`,
+      });
+    } catch (cause) {
+      toast.error(cause instanceof Error ? cause.message : "Could not record payment");
+    }
   }
 
   return (
@@ -126,9 +130,10 @@ export function SettleUpPanel({
                         variant="outline"
                         size="sm"
                         className="h-9 grow sm:grow-0"
+                        disabled={!involvesMe}
                         onClick={() => setConfirming(debt)}
                       >
-                        <CheckCircle2 aria-hidden /> Mark as paid
+                        <CheckCircle2 aria-hidden /> {involvesMe ? "Mark as paid" : "Payer or recipient only"}
                       </Button>
                     </div>
                   </li>

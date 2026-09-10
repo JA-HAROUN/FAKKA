@@ -1,28 +1,21 @@
-import { useMemo, useState } from "react";
-import { Check, Search, UserPlus } from "lucide-react";
-import { toast } from "sonner";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { ResponsiveModal } from "@/components/common/ResponsiveModal";
 import { UserAvatar } from "@/components/common/UserAvatar";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { useApp } from "@/context/AppContext";
-import { discoverableUsers } from "@/utils/mockData";
+import { Check, Search, UserPlus } from "lucide-react";
+import { useState } from "react";
+import { toast } from "sonner";
 
 /** Find registered people by name or email and add them as a friend. */
 export function AddFriendDialog() {
-  const { addFriend, friendIds, currentUser } = useApp();
+  const { addFriend, friendIds } = useApp();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
 
-  const results = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return [];
-    return discoverableUsers.filter(
-      (u) =>
-        u.id !== currentUser?.id &&
-        (u.email.toLowerCase().includes(q) || u.name.toLowerCase().includes(q)),
-    );
-  }, [query, currentUser]);
+  const result = query.trim()
+    ? { id: "lookup", name: query.trim(), email: query.includes("@") ? query.trim() : "", avatar: query.trim() }
+    : null;
 
   return (
     <ResponsiveModal
@@ -63,15 +56,15 @@ export function AddFriendDialog() {
             </p>
           )}
 
-          {query.trim() && results.length === 0 && (
+          {query.trim() && !result && (
             <p className="px-1 py-8 text-center text-sm text-muted-foreground">
               No one matches “{query.trim()}”. Check the spelling, or ask them to sign up first.
             </p>
           )}
 
-          {results.length > 0 && (
+          {result && (
             <ul className="divide-y divide-border overflow-hidden rounded-lg border border-border">
-              {results.map((user) => {
+              {[result].map((user) => {
                 const added = friendIds.includes(user.id);
                 return (
                   <li key={user.id} className="flex items-center gap-3 px-3 py-2.5">
@@ -85,8 +78,9 @@ export function AddFriendDialog() {
                       variant={added ? "secondary" : "outline"}
                       disabled={added}
                       onClick={() => {
-                        addFriend(user);
-                        toast.success(`${user.name} added to your friends`);
+                        void addFriend(user)
+                          .then(() => toast.success(`${user.name} added to your friends`))
+                          .catch((error: unknown) => toast.error(error instanceof Error ? error.message : "Could not add friend"));
                       }}
                     >
                       {added ? (

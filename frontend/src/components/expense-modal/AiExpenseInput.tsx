@@ -1,10 +1,10 @@
-import { useState } from "react";
-import { Info, Loader2, Sparkles } from "lucide-react";
+import { Field } from "@/components/common/Field";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Field } from "@/components/common/Field";
+import { useApp } from "@/context/AppContext";
 import type { ExpenseDraft, User } from "@/types";
-import { parseExpenseText } from "@/utils/parseNaturalLanguage";
+import { Info, Loader2, Sparkles } from "lucide-react";
+import { useState } from "react";
 
 const EXAMPLE =
   "John paid 900 EGP for dinner. John and Ahmed shared the pizza and Mohamed had the burger.";
@@ -15,18 +15,20 @@ const EXAMPLE =
  * misreads the description.
  */
 export function AiExpenseInput({
+  groupId,
   members,
-  fallbackPayer,
   onParsed,
   onSwitchToManual,
 }: {
+  groupId: string;
   members: User[];
-  fallbackPayer: string;
   onParsed: (draft: ExpenseDraft) => void;
   onSwitchToManual: () => void;
 }) {
   const [text, setText] = useState("");
+  const { parseExpense } = useApp();
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   return (
     <div className="space-y-4">
@@ -48,10 +50,13 @@ export function AiExpenseInput({
           disabled={!text.trim() || loading}
           onClick={() => {
             setLoading(true);
-            setTimeout(() => {
-              onParsed(parseExpenseText(text, members, fallbackPayer));
-              setLoading(false);
-            }, 1200);
+            setError(null);
+            void parseExpense(groupId, text)
+              .then((draft) => onParsed(draft))
+              .catch((cause: unknown) => {
+                setError(cause instanceof Error ? cause.message : "AI parsing failed. Enter it manually.");
+              })
+              .finally(() => setLoading(false));
           }}
         >
           {loading ? (
@@ -72,6 +77,8 @@ export function AiExpenseInput({
           Use the example
         </button>
       </div>
+
+      {error && <p className="text-caption text-negative">{error}</p>}
 
       <p className="panel-inset flex items-start gap-2 px-3 py-2.5 text-caption text-muted-foreground">
         <Info className="mt-0.5 size-3.5 shrink-0" aria-hidden />

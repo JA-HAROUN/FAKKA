@@ -1,9 +1,9 @@
-import { useState } from "react";
+import { PasswordInput } from "@/components/auth/PasswordInput";
+import { Field, FormError } from "@/components/common/Field";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Field, FormError } from "@/components/common/Field";
-import { PasswordInput } from "@/components/auth/PasswordInput";
 import { useApp } from "@/context/AppContext";
+import { useState } from "react";
 
 export function LoginForm({ onSuccess }: { onSuccess: () => void }) {
   const { signIn } = useApp();
@@ -18,11 +18,11 @@ export function LoginForm({ onSuccess }: { onSuccess: () => void }) {
     setErrors(next);
     if (Object.keys(next).length > 0) return;
 
-    if (!signIn(email)) {
-      setErrors({ form: "We couldn't match those details. Check the email and try again." });
-      return;
-    }
-    onSuccess();
+    void signIn(email, password)
+      .then(onSuccess)
+      .catch((error: unknown) => {
+        setErrors({ form: error instanceof Error ? error.message : "Sign-in failed. Try again." });
+      });
   }
 
   return (
@@ -66,7 +66,7 @@ export function LoginForm({ onSuccess }: { onSuccess: () => void }) {
       </Button>
 
       <p className="text-center text-caption text-muted-foreground">
-        Demo account is pre-filled — any password works.
+        Use the password you chose when you created your account.
       </p>
     </form>
   );

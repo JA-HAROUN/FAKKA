@@ -1,9 +1,9 @@
-import { useState } from "react";
+import { PasswordInput } from "@/components/auth/PasswordInput";
+import { Field } from "@/components/common/Field";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Field } from "@/components/common/Field";
-import { PasswordInput } from "@/components/auth/PasswordInput";
 import { useApp } from "@/context/AppContext";
+import { useState } from "react";
 
 const MIN_PASSWORD_LENGTH = 4;
 
@@ -25,8 +25,11 @@ export function RegisterForm({ onSuccess }: { onSuccess: () => void }) {
     setErrors(next);
     if (Object.keys(next).length > 0) return;
 
-    signUp(name, email);
-    onSuccess();
+    void signUp(name, email, password)
+      .then(onSuccess)
+      .catch((error: unknown) => {
+        setErrors({ email: error instanceof Error ? error.message : "Account creation failed." });
+      });
   }
 
   return (

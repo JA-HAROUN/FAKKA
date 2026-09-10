@@ -1,74 +1,90 @@
-import {
-  createContext,
-  useCallback,
-  useContext,
-  useEffect,
-  useMemo,
-  useState,
-  type ReactNode,
-} from "react";
+import { api, backendErrorMessage, type ParsedReceipt } from "@/lib/api";
 import type { Expense, ExpenseDraft, Group, Settlement, User } from "@/types";
-import {
-  CURRENT_USER_ID,
-  mockExpenses,
-  mockGroups,
-  mockSettlements,
-  mockUsers,
-} from "@/utils/mockData";
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 
 const STORAGE_KEY = "splitease.state.v1";
+const USER_KEY = "splitease.user.v1";
 
 interface PersistedState {
   currentUserId: string | null;
+}
+
+const initialState: PersistedState = { currentUserId: null };
+
+interface AppContextValue extends PersistedState {
+  hydrated: boolean;
+  loading: boolean;
+  error: string | null;
+  currentUser: User | null;
   users: User[];
   friendIds: string[];
   groups: Group[];
   expenses: Expense[];
   settlements: Settlement[];
-}
-
-const initialState: PersistedState = {
-  currentUserId: null,
-  users: mockUsers,
-  friendIds: ["u2", "u3", "u4", "u5"],
-  groups: mockGroups,
-  expenses: mockExpenses,
-  settlements: mockSettlements,
-};
-
-interface AppContextValue extends PersistedState {
-  hydrated: boolean;
-  currentUser: User | null;
   friends: User[];
   userById: (id: string) => User;
-  signIn: (email: string) => boolean;
-  signUp: (name: string, email: string) => void;
+  signIn: (email: string, password: string) => Promise<boolean>;
+  signUp: (name: string, email: string, password: string) => Promise<void>;
   signOut: () => void;
-  addFriend: (user: User) => void;
-  createGroup: (input: { name: string; image: string; memberIds: string[] }) => Group;
-  addExpense: (groupId: string, draft: ExpenseDraft) => void;
+  addFriend: (user: User) => Promise<void>;
+  createGroup: (input: { name: string; image: string; memberIds: string[] }) => Promise<Group>;
+  addExpense: (groupId: string, draft: ExpenseDraft) => Promise<void>;
   markSettlementPaid: (input: {
     groupId: string;
     fromUser: string;
     toUser: string;
     amount: number;
-  }) => void;
+  }) => Promise<void>;
+  parseExpense: (groupId: string, text: string) => Promise<ExpenseDraft>;
+  parseReceipt: (groupId: string, image: File) => Promise<ParsedReceipt>;
+  exportGroup: (groupId: string) => Promise<Blob>;
   expensesOfGroup: (groupId: string) => Expense[];
   settlementsOfGroup: (groupId: string) => Settlement[];
 }
 
 const AppContext = createContext<AppContextValue | null>(null);
 
-const uid = (prefix: string) => `${prefix}${Math.random().toString(36).slice(2, 9)}`;
-
 export function AppProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<PersistedState>(initialState);
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [users, setUsers] = useState<User[]>([]);
+  const [friendIds, setFriendIds] = useState<string[]>([]);
+  const [groups, setGroups] = useState<Group[]>([]);
+  const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [settlements, setSettlements] = useState<Settlement[]>([]);
   const [hydrated, setHydrated] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const refresh = useCallback(async (user: User) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const [nextGroups, nextFriends] = await Promise.all([
+        api.listGroups(user.id),
+        api.listFriends(user.id),
+      ]);
+      const loaded = await Promise.all(nextGroups.map((group) => api.loadGroup(group.id)));
+      setGroups(loaded.map((item) => item.group));
+      setUsers([user, ...nextFriends, ...loaded.flatMap((item) => item.users)].filter((candidate, index, all) =>
+        all.findIndex((other) => other.id === candidate.id) === index,
+      ));
+      setFriendIds(nextFriends.map((friend) => friend.id));
+      setExpenses(loaded.flatMap((item) => item.expenses));
+      setSettlements(loaded.flatMap((item) => item.settlements));
+    } catch (cause) {
+      setError(backendErrorMessage(cause));
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
       if (raw) setState({ ...initialState, ...(JSON.parse(raw) as PersistedState) });
+      const storedUser = localStorage.getItem(USER_KEY);
+      if (storedUser) setCurrentUser(JSON.parse(storedUser) as User);
     } catch {
       /* ignore corrupt storage */
     }
@@ -84,107 +100,97 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   }, [state, hydrated]);
 
+  useEffect(() => {
+    if (!hydrated || !state.currentUserId || !currentUser) return;
+    void refresh(currentUser);
+  }, [currentUser, hydrated, refresh, state.currentUserId]);
+
   const userById = useCallback(
     (id: string): User =>
-      state.users.find((u) => u.id === id) ?? {
+      users.find((u) => u.id === id) ?? {
         id,
         name: "Unknown",
         email: "",
-        avatar: "❓",
+        avatar: "?",
       },
-    [state.users],
+    [users],
   );
 
-  const signIn = useCallback((email: string) => {
-    let ok = false;
-    setState((prev) => {
-      const match = prev.users.find((u) => u.email.toLowerCase() === email.trim().toLowerCase());
-      const target = match ?? prev.users.find((u) => u.id === CURRENT_USER_ID)!;
-      ok = true;
-      return { ...prev, currentUserId: target.id };
-    });
-    return ok;
+  const signIn = useCallback(async (email: string, password: string) => {
+    const user = await api.signIn(email, password);
+    setCurrentUser(user);
+    localStorage.setItem(USER_KEY, JSON.stringify(user));
+    setUsers((previous) => [user, ...previous.filter((candidate) => candidate.id !== user.id)]);
+    setState({ currentUserId: user.id });
+    await refresh(user);
+    return true;
+  }, [refresh]);
+
+  const signUp = useCallback(async (name: string, email: string, password: string) => {
+    const user = await api.signUp(name, email, password);
+    setCurrentUser(user);
+    localStorage.setItem(USER_KEY, JSON.stringify(user));
+    setUsers([user]);
+    setState({ currentUserId: user.id });
+    await refresh(user);
+  }, [refresh]);
+
+  const signOut = useCallback(() => {
+    setState({ currentUserId: null });
+    setCurrentUser(null);
+    localStorage.removeItem(USER_KEY);
+    setUsers([]);
+    setFriendIds([]);
+    setGroups([]);
+    setExpenses([]);
+    setSettlements([]);
   }, []);
 
-  const signUp = useCallback((name: string, email: string) => {
-    setState((prev) => {
-      const existing = prev.users.find((u) => u.email.toLowerCase() === email.trim().toLowerCase());
-      if (existing) return { ...prev, currentUserId: existing.id };
-      const user: User = {
-        id: uid("u"),
-        name: name.trim() || "New user",
-        email: email.trim(),
-        avatar: "🙂",
-      };
-      return { ...prev, users: [...prev.users, user], currentUserId: user.id };
-    });
-  }, []);
+  const addFriend = useCallback(async (user: User) => {
+    if (!currentUser) return;
+    const friend = await api.addFriend(currentUser.id, user.email || user.name);
+    setUsers((previous) => [...previous.filter((candidate) => candidate.id !== friend.id), friend]);
+    setFriendIds((previous) => (previous.includes(friend.id) ? previous : [...previous, friend.id]));
+  }, [currentUser]);
 
-  const signOut = useCallback(() => setState((prev) => ({ ...prev, currentUserId: null })), []);
-
-  const addFriend = useCallback((user: User) => {
-    setState((prev) => {
-      if (prev.friendIds.includes(user.id)) return prev;
-      const users = prev.users.some((u) => u.id === user.id) ? prev.users : [...prev.users, user];
-      return { ...prev, users, friendIds: [...prev.friendIds, user.id] };
-    });
-  }, []);
-
-  const createGroup = useCallback<AppContextValue["createGroup"]>((input) => {
-    const group: Group = {
-      id: uid("g"),
-      name: input.name,
-      image: input.image,
-      members: input.memberIds,
-      createdAt: new Date().toISOString(),
-    };
-    setState((prev) => ({ ...prev, groups: [group, ...prev.groups] }));
+  const createGroup = useCallback<AppContextValue["createGroup"]>(async (input) => {
+    if (!currentUser) throw new Error("You must be signed in.");
+    const group = await api.createGroup(currentUser.id, input);
+    setGroups((previous) => [group, ...previous]);
     return group;
+  }, [currentUser]);
+
+  const addExpense = useCallback(async (groupId: string, draft: ExpenseDraft) => {
+    const expense = await api.createExpense(groupId, draft);
+    setExpenses((previous) => [...previous, expense]);
   }, []);
 
-  const addExpense = useCallback((groupId: string, draft: ExpenseDraft) => {
-    const expense: Expense = {
-      id: uid("e"),
-      groupId,
-      createdAt: new Date().toISOString(),
-      category: draft.category,
-      description: draft.description,
-      totalAmount: draft.totalAmount,
-      paidBy: draft.paidBy,
-      participants: draft.participants,
-      splitType: draft.splitType,
-      shares: draft.shares,
-      source: draft.source,
-      ...(draft.image !== undefined ? { image: draft.image } : {}),
-      ...(draft.items !== undefined ? { items: draft.items } : {}),
-    };
-    setState((prev) => ({ ...prev, expenses: [...prev.expenses, expense] }));
-  }, []);
+  const markSettlementPaid = useCallback<AppContextValue["markSettlementPaid"]>(async (input) => {
+    const pending = await api.createSettlement(input.groupId, input.fromUser, input.toUser, input.amount);
+    const settlement = await api.markSettlementPaid(pending.id, currentUser?.id ?? "");
+    setSettlements((previous) => [...previous.filter((item) => item.id !== settlement.id), settlement]);
+  }, [currentUser]);
 
-  const markSettlementPaid = useCallback<AppContextValue["markSettlementPaid"]>((input) => {
-    setState((prev) => ({
-      ...prev,
-      settlements: [
-        ...prev.settlements,
-        {
-          id: uid("s"),
-          groupId: input.groupId,
-          fromUser: input.fromUser,
-          toUser: input.toUser,
-          amount: input.amount,
-          status: "paid",
-          paidAt: new Date().toISOString(),
-        },
-      ],
-    }));
-  }, []);
+  const parseExpense = useCallback(async (groupId: string, text: string) => {
+    return api.parseExpense(groupId, text, users);
+  }, [users]);
+
+  const parseReceipt = useCallback((groupId: string, image: File) => api.parseReceipt(groupId, image), []);
+  const exportGroup = useCallback((groupId: string) => api.exportGroup(groupId), []);
 
   const value = useMemo<AppContextValue>(
     () => ({
       ...state,
+      users,
+      friendIds,
+      groups,
+      expenses,
+      settlements,
       hydrated,
-      currentUser: state.currentUserId ? userById(state.currentUserId) : null,
-      friends: state.friendIds.map(userById),
+      loading,
+      error,
+      currentUser,
+      friends: friendIds.map(userById),
       userById,
       signIn,
       signUp,
@@ -193,13 +199,23 @@ export function AppProvider({ children }: { children: ReactNode }) {
       createGroup,
       addExpense,
       markSettlementPaid,
-      expensesOfGroup: (groupId: string) => state.expenses.filter((e) => e.groupId === groupId),
-      settlementsOfGroup: (groupId: string) =>
-        state.settlements.filter((s) => s.groupId === groupId),
+      parseExpense,
+      parseReceipt,
+      exportGroup,
+      expensesOfGroup: (groupId: string) => expenses.filter((e) => e.groupId === groupId),
+      settlementsOfGroup: (groupId: string) => settlements.filter((s) => s.groupId === groupId),
     }),
     [
       state,
+      users,
+      friendIds,
+      groups,
+      expenses,
+      settlements,
       hydrated,
+      loading,
+      error,
+      currentUser,
       userById,
       signIn,
       signUp,
@@ -208,6 +224,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
       createGroup,
       addExpense,
       markSettlementPaid,
+      parseExpense,
+      parseReceipt,
+      exportGroup,
     ],
   );
 

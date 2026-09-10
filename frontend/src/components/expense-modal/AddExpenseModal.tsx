@@ -1,18 +1,18 @@
-import { useState } from "react";
-import { ArrowLeft, Plus } from "lucide-react";
-import { toast } from "sonner";
-import { Button } from "@/components/ui/button";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Money } from "@/components/common/Money";
 import { ResponsiveModal } from "@/components/common/ResponsiveModal";
 import { UserAvatar } from "@/components/common/UserAvatar";
+import { Button } from "@/components/ui/button";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useApp } from "@/context/AppContext";
 import type { ExpenseDraft, Group } from "@/types";
-import { getCategory } from "@/utils/categories";
 import { equalShares, formatAmount } from "@/utils/calculations";
+import { getCategory } from "@/utils/categories";
 import { formatNumber, pluralize } from "@/utils/format";
-import { ManualExpenseForm, draftError } from "./ManualExpenseForm";
+import { ArrowLeft, Plus } from "lucide-react";
+import { useState } from "react";
+import { toast } from "sonner";
 import { AiExpenseInput } from "./AiExpenseInput";
+import { ManualExpenseForm, draftError } from "./ManualExpenseForm";
 
 type Method = "manual" | "ai";
 
@@ -56,13 +56,17 @@ export function AddExpenseModal({ group }: { group: Group }) {
     setReviewing(true);
   }
 
-  function save() {
-    addExpense(group.id, draft);
-    setOpen(false);
-    reset();
-    toast.success("Expense added", {
-      description: `${draft.description} · ${formatAmount(draft.totalAmount)}`,
-    });
+  async function save() {
+    try {
+      await addExpense(group.id, draft);
+      setOpen(false);
+      reset();
+      toast.success("Expense added", {
+        description: `${draft.description} · ${formatAmount(draft.totalAmount)}`,
+      });
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Could not save the expense.");
+    }
   }
 
   const category = getCategory(draft.category);
@@ -178,6 +182,7 @@ export function AddExpenseModal({ group }: { group: Group }) {
 
           <TabsContent value="manual">
             <ManualExpenseForm
+              groupId={group.id}
               members={members}
               draft={draft}
               setDraft={(d) => {
@@ -191,8 +196,8 @@ export function AddExpenseModal({ group }: { group: Group }) {
 
           <TabsContent value="ai">
             <AiExpenseInput
+              groupId={group.id}
               members={members}
-              fallbackPayer={payer}
               onParsed={(d) => {
                 setDraft(d);
                 setMethod("manual");
