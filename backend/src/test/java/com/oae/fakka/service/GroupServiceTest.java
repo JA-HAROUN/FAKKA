@@ -26,6 +26,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
@@ -244,11 +245,7 @@ class GroupServiceTest {
                 .containsExactly(tuple(10L, "Dinner", 3), tuple(11L, "Trip", 1));
     }
 
-    /**
-     * The contract that has to hold before the balance engine exists: whatever it eventually
-     * returns, the sign decides the badge. Mocking it is the only way to prove that today, while
-     * the real implementation still answers 0.
-     */
+    /** Whatever the engine returns, the sign of it decides the badge on the card. */
     @Test
     void listGroupsForUserDerivesStatusFromWhateverTheBalanceEngineReturns() {
         given(userRepository.existsById(1L)).willReturn(true);
@@ -256,9 +253,8 @@ class GroupServiceTest {
                 group(10L, "Owed"), group(11L, "Owing"), group(12L, "Even")));
         given(groupMemberRepository.countMembersOf(anyCollection()))
                 .willReturn(List.of(new Count(10L, 2), new Count(11L, 2), new Count(12L, 2)));
-        given(balanceService.calculateUserBalanceInGroup(1L, 10L)).willReturn(35_000L);
-        given(balanceService.calculateUserBalanceInGroup(1L, 11L)).willReturn(-12_550L);
-        given(balanceService.calculateUserBalanceInGroup(1L, 12L)).willReturn(0L);
+        given(balanceService.calculateUserBalanceInGroups(eq(1L), anyCollection()))
+                .willReturn(Map.of(10L, 35_000L, 11L, -12_550L, 12L, 0L));
 
         List<GroupCardResponse> cards = groupService.listGroupsForUser(1L);
 
@@ -270,14 +266,15 @@ class GroupServiceTest {
                         tuple(0L, BalanceStatus.SETTLED));
     }
 
-    /** Today every card is SETTLED, and a client reading the endpoint should see exactly that. */
+    /** A group whose expenses cancel out reads as settled rather than as having no balance. */
     @Test
-    void listGroupsForUserReportsSettledWhileTheEngineIsStubbed() {
+    void listGroupsForUserReportsSettledForAZeroBalance() {
         given(userRepository.existsById(1L)).willReturn(true);
         given(groupRepository.findGroupsOf(1L)).willReturn(List.of(group(10L, "Dinner")));
         given(groupMemberRepository.countMembersOf(anyCollection()))
                 .willReturn(List.of(new Count(10L, 2)));
-        given(balanceService.calculateUserBalanceInGroup(1L, 10L)).willReturn(0L);
+        given(balanceService.calculateUserBalanceInGroups(eq(1L), anyCollection()))
+                .willReturn(Map.of(10L, 0L));
 
         assertThat(groupService.listGroupsForUser(1L))
                 .singleElement()
@@ -299,6 +296,22 @@ class GroupServiceTest {
         assertThat(groupService.listGroupsForUser(1L))
                 .extracting(GroupCardResponse::name)
                 .containsExactly("Newest", "Middle", "Oldest");
+    }
+
+    /** One balance lookup for every card, not one per card. */
+    @Test
+    void listGroupsForUserAsksTheBalanceEngineOnceForEveryGroup() {
+        given(userRepository.existsById(1L)).willReturn(true);
+        given(groupRepository.findGroupsOf(1L)).willReturn(List.of(group(10L, "Dinner"), group(11L, "Trip")));
+        given(groupMemberRepository.countMembersOf(anyCollection()))
+                .willReturn(List.of(new Count(10L, 3), new Count(11L, 1)));
+        given(balanceService.calculateUserBalanceInGroups(eq(1L), anyCollection()))
+                .willReturn(Map.of(10L, 100L, 11L, -100L));
+
+        groupService.listGroupsForUser(1L);
+
+        verify(balanceService, times(1)).calculateUserBalanceInGroups(eq(1L), groupIdsCaptor.capture());
+        assertThat(groupIdsCaptor.getValue()).containsExactly(10L, 11L);
     }
 
     /** One grouped count for the whole dashboard, not one per card. */

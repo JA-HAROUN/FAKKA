@@ -28,6 +28,21 @@ public interface GroupMemberRepository extends JpaRepository<GroupMember, Long> 
     List<User> findMembersOf(@Param("groupId") Long groupId);
 
     /**
+     * Just the member ids of a group, ordered for a stable result.
+     * <p>
+     * Separate from {@link #findMembersOf} because the balance engine needs the ids and not the
+     * profiles: loading three users to subtract three numbers would be a query for data nothing
+     * reads.
+     */
+    @Query("""
+            select m.userId
+            from GroupMember m
+            where m.groupId = :groupId
+            order by m.userId asc
+            """)
+    List<Long> findUserIdsOf(@Param("groupId") Long groupId);
+
+    /**
      * Of {@code candidateIds}, the ones that are members of {@code groupId}.
      * <p>
      * One query for the payer and every participant together, so an expense naming several

@@ -104,9 +104,8 @@ public class GroupService {
      * The dashboard: every group the user belongs to, with its size and their standing in it
      * (FR-4, FR-5).
      * <p>
-     * <strong>Balances are 0 until the engine exists</strong>, so every card comes back
-     * {@code SETTLED} today. See {@link BalanceService#calculateUserBalanceInGroup} for what
-     * Phase 5 has to fill in; nothing else here changes when it does.
+     * Four queries in total, whatever the number of groups: the groups, their member counts, and
+     * the two halves of the balance for all of them at once.
      */
     @Transactional(readOnly = true)
     public List<GroupCardResponse> listGroupsForUser(Long userId) {
@@ -125,17 +124,20 @@ public class GroupService {
             return List.of();
         }
 
+        List<Long> groupIds = groups.stream().map(Group::getId).toList();
         Map<Long, Long> memberCounts = groupMemberRepository
-                .countMembersOf(groups.stream().map(Group::getId).toList()).stream()
+                .countMembersOf(groupIds).stream()
                 .collect(Collectors.toMap(
                         GroupMemberRepository.MemberCount::getGroupId,
                         GroupMemberRepository.MemberCount::getMemberCount));
 
         /*
-         * The balance call is per group, which is fine only because it is a stub that touches
-         * nothing. TODO(Phase 5): once it reads expenses, replace this with one grouped query
-         * for the whole dashboard, or a twenty-group dashboard becomes twenty scans.
+         * One balance lookup for the whole dashboard rather than one per card: now that the
+         * engine reads expenses, a per-group call would scan a twenty-group dashboard twenty
+         * times over.
          */
+        Map<Long, Long> balances = balanceService.calculateUserBalanceInGroups(userId, groupIds);
+
         return groups.stream()
                 .map(group -> GroupCardResponse.of(
                         group,
@@ -145,7 +147,7 @@ public class GroupService {
                          * rendering if that ever stops being true.
                          */
                         Math.toIntExact(memberCounts.getOrDefault(group.getId(), 0L)),
-                        balanceService.calculateUserBalanceInGroup(userId, group.getId())))
+                        balances.getOrDefault(group.getId(), 0L)))
                 .toList();
     }
 
