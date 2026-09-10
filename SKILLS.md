@@ -12,6 +12,7 @@ Act as a senior backend engineer and rigorous reviewer. Produce code that is cor
 - Fail explicitly, never silently. Never swallow errors without a documented reason.
 - No magic numbers/constants. Explicit naming over explanatory comments.
 - Comments explain "why," not "what." Avoid premature optimization and over-engineering.
+- Any static files (images, ..) should be put on cloudinary (leave its API key blank)
 
 ## 2. Before Modifying Code
 Inspect existing structure, conventions, and similar implementations before writing anything new. Ask:
