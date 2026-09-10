@@ -55,11 +55,11 @@ export function ReceiptItemsField({
         className="row-hover flex w-full cursor-pointer items-center gap-3 px-3 py-3 text-left"
       >
         <ScanLine className="size-4 shrink-0 text-muted-foreground" aria-hidden />
-        <span className="min-w-0 flex-1 text-[13px] font-medium">
+        <span className="min-w-0 flex-1 text-label font-semibold">
           Item list <span className="font-normal text-muted-foreground">· optional</span>
         </span>
         {items.length > 0 && (
-          <span className="text-xs tabular-nums text-muted-foreground">
+          <span className="text-caption tabular-nums text-muted-foreground">
             {pluralize(items.length, "item")} · {formatAmount(total)}
           </span>
         )}
@@ -74,14 +74,14 @@ export function ReceiptItemsField({
 
       {open && (
         <div className="space-y-3 border-t border-border p-3">
-          <p className="text-xs text-muted-foreground">
+          <p className="text-caption text-muted-foreground">
             Scan a receipt or type the items in by hand — this just records what was bought.
           </p>
 
           <div className="flex flex-wrap gap-2">
             <Label
               htmlFor="ocr-file"
-              className="inline-flex h-8 cursor-pointer items-center gap-2 rounded-md border border-input bg-card px-3 text-[13px] font-medium transition-colors hover:bg-surface"
+              className="inline-flex h-8 cursor-pointer items-center gap-2 rounded-md border border-input bg-card px-3 text-label font-semibold transition-colors hover:bg-surface"
             >
               <ScanLine className="size-4" aria-hidden /> Scan a receipt
             </Label>
@@ -108,7 +108,7 @@ export function ReceiptItemsField({
 
           {items.length > 0 && (
             <ul className="space-y-2">
-              <li className="hidden gap-2 px-1 text-xs font-medium text-muted-foreground sm:flex">
+              <li className="eyebrow hidden gap-2 px-1 sm:flex">
                 <span className="flex-1">Item</span>
                 <span className="w-14 text-center">Qty</span>
                 <span className="w-24 text-right">Price</span>
@@ -117,14 +117,14 @@ export function ReceiptItemsField({
               {items.map((item) => (
                 <li key={item.id} className="flex items-center gap-2">
                   <Input
-                    className="h-9 min-w-0 flex-1"
+                    className="h-9 min-w-0 flex-1 rounded-md"
                     value={item.name}
                     onChange={(e) => updateItem(item.id, { name: e.target.value })}
                     placeholder="Item name"
                     aria-label="Item name"
                   />
                   <Input
-                    className="h-9 w-14 text-center tabular-nums"
+                    className="h-9 w-14 rounded-md text-center tabular-nums"
                     type="number"
                     inputMode="numeric"
                     min={1}
@@ -133,7 +133,7 @@ export function ReceiptItemsField({
                     aria-label="Quantity"
                   />
                   <Input
-                    className="h-9 w-24 text-right tabular-nums"
+                    className="h-9 w-24 rounded-md text-right tabular-nums"
                     type="number"
                     inputMode="decimal"
                     min={0}

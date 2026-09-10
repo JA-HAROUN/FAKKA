@@ -32,7 +32,7 @@ export function Field({
 
   return (
     <div className={cn("space-y-1.5", className)}>
-      <Label htmlFor={id} className="text-label font-semibold">
+      <Label htmlFor={id}>
         {label}
         {required && (
           <span className="ml-0.5 text-negative" aria-hidden>

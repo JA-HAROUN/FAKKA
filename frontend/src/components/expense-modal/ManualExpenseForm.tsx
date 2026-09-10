@@ -111,7 +111,7 @@ export function ManualExpenseForm({
         </Field>
 
         <div className="space-y-1.5">
-          <Label className="text-[13px] font-medium">Category</Label>
+          <Label>Category</Label>
           <Select
             value={draft.category}
             onValueChange={(v) => update({ category: v as CategoryId })}
@@ -132,7 +132,7 @@ export function ManualExpenseForm({
       </div>
 
       <div className="space-y-1.5">
-        <Label className="text-[13px] font-medium">
+        <Label>
           Who paid?<span className="text-negative">*</span>
         </Label>
         <Select value={draft.paidBy} onValueChange={(v) => update({ paidBy: v })}>
@@ -153,7 +153,7 @@ export function ManualExpenseForm({
       {/* Split */}
       <div className="space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <Label className="text-[13px] font-medium">How is it split?</Label>
+          <Label>How is it split?</Label>
           <div
             role="radiogroup"
             aria-label="Split method"
@@ -177,7 +177,7 @@ export function ManualExpenseForm({
                     })
                   }
                   className={cn(
-                    "cursor-pointer rounded-md px-3 py-1.5 text-[13px] font-medium transition-colors",
+                    "cursor-pointer rounded-md px-3 py-1.5 text-label font-semibold transition-colors",
                     active
                       ? "bg-card text-foreground shadow-xs"
                       : "text-muted-foreground hover:text-foreground",
@@ -193,12 +193,12 @@ export function ManualExpenseForm({
         {draft.splitType === "equal" ? (
           <div className="space-y-2">
             <div className="flex items-center justify-between gap-3">
-              <p className="text-xs text-muted-foreground">
+              <p className="text-caption text-muted-foreground">
                 Everyone ticked below splits it evenly.
               </p>
               <button
                 type="button"
-                className="cursor-pointer text-xs font-medium text-primary hover:underline"
+                className="cursor-pointer text-caption font-semibold text-primary hover:underline"
                 onClick={() => {
                   const all = draft.participants.length === members.length;
                   const participants = all ? [] : members.map((m) => m.id);
@@ -223,11 +223,11 @@ export function ManualExpenseForm({
                       <span className="text-base" aria-hidden>
                         {member.avatar}
                       </span>
-                      <span className="min-w-0 flex-1 truncate text-sm font-medium">
+                      <span className="min-w-0 flex-1 truncate text-body font-semibold">
                         {member.name}
                       </span>
                       {checked && (
-                        <span className="text-sm font-medium tabular-nums">
+                        <span className="text-body font-semibold tabular-nums">
                           {formatNumber(draft.shares[member.id] ?? 0)}
                         </span>
                       )}
@@ -239,7 +239,7 @@ export function ManualExpenseForm({
           </div>
         ) : (
           <div className="space-y-3">
-            <p className="text-xs text-muted-foreground">
+            <p className="text-caption text-muted-foreground">
               Enter what each person owes. Leave someone at zero to leave them out.
             </p>
 
@@ -249,13 +249,15 @@ export function ManualExpenseForm({
                   <span className="text-base" aria-hidden>
                     {member.avatar}
                   </span>
-                  <span className="min-w-0 flex-1 truncate text-sm font-medium">{member.name}</span>
+                  <span className="min-w-0 flex-1 truncate text-body font-semibold">
+                    {member.name}
+                  </span>
                   <Input
                     type="number"
                     inputMode="decimal"
                     min={0}
                     step="0.01"
-                    className="h-9 w-24 text-right tabular-nums"
+                    className="h-9 w-24 rounded-md text-right tabular-nums"
                     value={draft.shares[member.id] ?? ""}
                     onChange={(e) => setCustomShare(member.id, Number(e.target.value) || 0)}
                     placeholder="0.00"
@@ -266,18 +268,18 @@ export function ManualExpenseForm({
             </ul>
 
             {/* Running reconciliation — the one thing that blocks saving. */}
-            <div className="panel-inset divide-y divide-border text-[13px]">
-              <div className="flex items-center justify-between px-3 py-2">
+            <div className="panel-inset divide-y divide-border text-label">
+              <div className="flex items-center justify-between px-3 py-2.5">
                 <span className="text-muted-foreground">Expense total</span>
-                <span className="font-medium tabular-nums">{formatAmount(draft.totalAmount)}</span>
+                <span className="font-semibold tabular-nums">{formatAmount(draft.totalAmount)}</span>
               </div>
-              <div className="flex items-center justify-between px-3 py-2">
+              <div className="flex items-center justify-between px-3 py-2.5">
                 <span className="text-muted-foreground">Assigned</span>
-                <span className="font-medium tabular-nums">{formatAmount(assigned)}</span>
+                <span className="font-semibold tabular-nums">{formatAmount(assigned)}</span>
               </div>
               <div
                 className={cn(
-                  "flex items-center justify-between px-3 py-2 font-medium",
+                  "flex items-center justify-between px-3 py-2.5 font-semibold",
                   balanced ? "text-positive" : "text-negative",
                 )}
               >
@@ -301,7 +303,7 @@ export function ManualExpenseForm({
       <div className="space-y-3 border-t border-border pt-5">
         <div className="space-y-1">
           <p className="section-label">Optional details</p>
-          <p className="text-xs text-muted-foreground">
+          <p className="text-caption text-muted-foreground">
             Record what was bought, or attach a photo of the bill. Neither changes the split.
           </p>
         </div>
@@ -318,7 +320,7 @@ export function ManualExpenseForm({
               alt="Attached bill"
               className="size-14 rounded-md border border-border object-cover"
             />
-            <p className="min-w-0 flex-1 text-[13px] text-muted-foreground">Photo attached</p>
+            <p className="min-w-0 flex-1 text-label text-muted-foreground">Photo attached</p>
             <Button
               type="button"
               variant="ghost"
@@ -337,7 +339,7 @@ export function ManualExpenseForm({
         ) : (
           <Label
             htmlFor="receipt-image"
-            className="row-hover flex cursor-pointer items-center gap-2.5 rounded-lg border border-dashed border-border px-3 py-3 text-[13px] font-normal text-muted-foreground"
+            className="row-hover flex cursor-pointer items-center gap-2.5 rounded-lg border border-dashed border-border px-3 py-3 text-label font-normal text-muted-foreground"
           >
             <ImagePlus className="size-4" aria-hidden />
             Attach a photo of the bill
@@ -358,13 +360,13 @@ export function ManualExpenseForm({
       {error && !splitError && <FormError message={error} />}
 
       <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border pt-4">
-        <p className="text-xs text-muted-foreground">
+        <p className="text-caption text-muted-foreground">
           {pluralize(draft.participants.length, "person", "people")} ·{" "}
           {draft.splitType === "equal" ? "equal split" : "custom split"}
           {draft.totalAmount > 0 && (
             <>
               {" · "}
-              <Money value={draft.totalAmount} size="xs" className="font-medium" />
+              <Money value={draft.totalAmount} size="xs" />
             </>
           )}
         </p>

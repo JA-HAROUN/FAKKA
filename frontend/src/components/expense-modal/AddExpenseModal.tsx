@@ -102,36 +102,37 @@ export function AddExpenseModal({ group }: { group: Group }) {
           <div className="panel-inset divide-y divide-border">
             <div className="flex items-center gap-3 p-4">
               <span
-                className="grid size-10 shrink-0 place-items-center rounded-lg border border-border bg-card text-muted-foreground"
+                className="grid size-10 shrink-0 place-items-center rounded-md border border-border bg-card text-muted-foreground"
                 aria-hidden
               >
                 <category.icon className="size-4" />
               </span>
               <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-semibold">{draft.description}</p>
-                <p className="truncate text-xs text-muted-foreground">
+                <p className="truncate text-body font-semibold">{draft.description}</p>
+                <p className="truncate text-caption text-muted-foreground">
                   {category.label} · paid by {userById(draft.paidBy).name}
                 </p>
               </div>
-              <Money value={draft.totalAmount} size="lg" />
+              {/* The figure being committed: the loudest thing in the review step. */}
+              <Money value={draft.totalAmount} size="xl" />
             </div>
 
             <div className="p-4">
-              <p className="text-xs font-medium text-muted-foreground">
+              <p className="eyebrow">
                 Split {draft.splitType === "equal" ? "equally" : "by custom amounts"} between{" "}
                 {pluralize(draft.participants.length, "person", "people")}
               </p>
-              <ul className="mt-2 space-y-2">
+              <ul className="mt-3 space-y-2">
                 {draft.participants.map((id) => (
                   <li key={id} className="flex items-center gap-3">
                     <UserAvatar user={userById(id)} size="xs" />
-                    <span className="min-w-0 flex-1 truncate text-[13px]">
+                    <span className="min-w-0 flex-1 truncate text-label">
                       {userById(id).name}
                       {id === currentUser?.id && (
-                        <span className="ml-1.5 text-xs text-muted-foreground">you</span>
+                        <span className="ml-1.5 text-caption text-muted-foreground">you</span>
                       )}
                     </span>
-                    <span className="text-[13px] font-medium tabular-nums">
+                    <span className="text-label font-semibold tabular-nums">
                       {formatNumber(draft.shares[id] ?? 0)}
                     </span>
                   </li>
@@ -141,10 +142,8 @@ export function AddExpenseModal({ group }: { group: Group }) {
 
             {draft.items && draft.items.length > 0 && (
               <div className="p-4">
-                <p className="text-xs font-medium text-muted-foreground">
-                  Items recorded ({draft.items.length})
-                </p>
-                <ul className="mt-2 space-y-1.5 text-[13px]">
+                <p className="eyebrow">Items recorded ({draft.items.length})</p>
+                <ul className="mt-3 space-y-1.5 text-label">
                   {draft.items.map((item) => (
                     <li key={item.id} className="flex justify-between gap-3">
                       <span className="min-w-0 truncate">
@@ -161,7 +160,7 @@ export function AddExpenseModal({ group }: { group: Group }) {
           </div>
 
           {draft.source !== "manual" && (
-            <p className="text-xs text-muted-foreground">
+            <p className="text-caption text-muted-foreground">
               Filled in from your description — edit anything that looks wrong before saving.
             </p>
           )}

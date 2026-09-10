@@ -66,21 +66,21 @@ export function AiExpenseInput({
         </Button>
         <button
           type="button"
-          className="cursor-pointer text-xs font-medium text-primary hover:underline"
+          className="cursor-pointer text-caption font-semibold text-primary hover:underline"
           onClick={() => setText(EXAMPLE)}
         >
           Use the example
         </button>
       </div>
 
-      <p className="flex items-start gap-2 rounded-lg border border-border bg-surface px-3 py-2.5 text-xs text-muted-foreground">
+      <p className="panel-inset flex items-start gap-2 px-3 py-2.5 text-caption text-muted-foreground">
         <Info className="mt-0.5 size-3.5 shrink-0" aria-hidden />
         <span>
           You review and edit everything before it's saved. If this can't read your description,{" "}
           <button
             type="button"
             onClick={onSwitchToManual}
-            className="cursor-pointer font-medium text-foreground underline underline-offset-2"
+            className="cursor-pointer font-semibold text-foreground underline underline-offset-2"
           >
             enter it manually
           </button>
