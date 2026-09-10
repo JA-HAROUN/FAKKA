@@ -82,7 +82,7 @@ public class ReceiptOcrService {
      */
     private static final Pattern ITEM_LINE = Pattern.compile(
             "^(?<name>[\\w][\\w .,'&-]{0,59}?)\\s+"
-                    + "(?:(?<qty>\\d+)\\s*[x×]\\s*)?"
+                    + "(?:(?:(?<qty1>\\d+)\\s*[x×])|(?:[x×]\\s*(?<qty2>\\d+))\\s*)?"
                     + "(?:EGP|LE|L\\.E\\.|£|\\$)?\\s*"
                     + "(?<price>\\d{1,7}(?:[.,]\\d{1,2})?)\\s*$",
             Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CHARACTER_CLASS);
@@ -317,7 +317,8 @@ public class ReceiptOcrService {
             }
 
             String name = m.group("name").strip();
-            int quantity = parseQuantity(m.group("qty"));
+            String qtyGroup = m.group("qty1") != null ? m.group("qty1") : m.group("qty2");
+            int quantity = parseQuantity(qtyGroup);
             long unitPrice = toPiastres(m.group("price"), -1L);
             if (unitPrice <= 0) {
                 continue; // price zero or unparseable — skip

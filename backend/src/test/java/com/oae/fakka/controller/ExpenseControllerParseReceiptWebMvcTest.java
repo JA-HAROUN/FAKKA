@@ -3,7 +3,7 @@ package com.oae.fakka.controller;
 import com.oae.fakka.dto.OcrReceiptItem;
 import com.oae.fakka.dto.ParsedReceiptResponse;
 import com.oae.fakka.exception.AiResponseNotUsableException;
-import com.oae.fakka.exception.AiUnavailableException;
+import com.oae.fakka.exception.OcrUnavailableException;
 import com.oae.fakka.exception.ResourceNotFoundException;
 import com.oae.fakka.service.ExpenseService;
 import com.oae.fakka.service.NaturalLanguageExpenseService;
@@ -160,7 +160,7 @@ class ExpenseControllerParseReceiptWebMvcTest {
     @Test
     void mapsAnUnavailableOcrServiceTo503() throws Exception {
         given(receiptOcrService.parse(anyLong(), any()))
-                .willThrow(new AiUnavailableException("The receipt scanner is not configured"));
+                .willThrow(new OcrUnavailableException("The receipt scanner is not configured"));
 
         mockMvc.perform(multipart("/api/groups/{groupId}/expenses/parse-receipt", 10)
                         .file(JPEG_IMAGE))
