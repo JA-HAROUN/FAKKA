@@ -1,0 +1,128 @@
+package com.oae.fakka.service;
+
+import com.oae.fakka.dto.CreateExpenseRequest;
+import com.oae.fakka.dto.ExpenseResponse;
+import com.oae.fakka.entity.Expense;
+import com.oae.fakka.entity.ExpenseParticipant;
+import com.oae.fakka.exception.NonGroupMemberException;
+import com.oae.fakka.exception.ResourceNotFoundException;
+import com.oae.fakka.repository.ExpenseParticipantRepository;
+import com.oae.fakka.repository.ExpenseRepository;
+import com.oae.fakka.repository.GroupMemberRepository;
+import com.oae.fakka.repository.GroupRepository;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.SequencedMap;
+import java.util.SequencedSet;
+import java.util.Set;
+
+/**
+ * Recording expenses (FR-12 to FR-19).
+ * <p>
+ * The arithmetic lives in {@link ExpenseSplitService}; this owns the parts that need the
+ * database: the group exists, everyone named is a member of it, and the expense plus its shares
+ * are written together.
+ */
+@Slf4j
+@Service
+public class ExpenseService {
+
+    private final GroupRepository groupRepository;
+    private final GroupMemberRepository groupMemberRepository;
+    private final ExpenseRepository expenseRepository;
+    private final ExpenseParticipantRepository expenseParticipantRepository;
+    private final ExpenseSplitService expenseSplitService;
+
+    public ExpenseService(
+            GroupRepository groupRepository,
+            GroupMemberRepository groupMemberRepository,
+            ExpenseRepository expenseRepository,
+            ExpenseParticipantRepository expenseParticipantRepository,
+            ExpenseSplitService expenseSplitService) {
+        this.groupRepository = groupRepository;
+        this.groupMemberRepository = groupMemberRepository;
+        this.expenseRepository = expenseRepository;
+        this.expenseParticipantRepository = expenseParticipantRepository;
+        this.expenseSplitService = expenseSplitService;
+    }
+
+    /**
+     * Validates, splits, and stores an expense with one share row per participant.
+     * <p>
+     * Transactional because an expense without its shares would be a cost nobody owes: the
+     * balance engine would read the payment and none of the debt, so every member balance in the
+     * group would be wrong and BR-5 would not hold.
+     */
+    @Transactional
+    public ExpenseResponse createExpense(Long groupId, CreateExpenseRequest request) {
+        if (!groupRepository.existsById(groupId)) {
+            throw new ResourceNotFoundException("Group", groupId);
+        }
+
+        requireEveryoneIsAMember(groupId, request);
+
+        /*
+         * Split before writing anything. The transaction would roll a bad split back anyway, but
+         * failing first keeps a rejected request from consuming an id and makes the ordering
+         * obvious: nothing is stored until the shares are known to balance.
+         */
+        SequencedMap<Long, Long> shares = expenseSplitService.split(
+                request.splitType(),
+                request.participantUserIds(),
+                request.totalAmount(),
+                request.customShares());
+
+        Expense expense = expenseRepository.saveAndFlush(Expense.builder()
+                .groupId(groupId)
+                .category(request.category())
+                .description(request.description())
+                .totalAmount(request.totalAmount())
+                .imageUrl(request.imageUrl())
+                .paidByUserId(request.paidByUserId())
+                .build());
+
+        List<ExpenseParticipant> participants = new ArrayList<>(shares.size());
+        for (Map.Entry<Long, Long> share : shares.entrySet()) {
+            participants.add(ExpenseParticipant.builder()
+                    .expenseId(expense.getId())
+                    .userId(share.getKey())
+                    .shareAmount(share.getValue())
+                    .build());
+        }
+        expenseParticipantRepository.saveAllAndFlush(participants);
+
+        log.info("Recorded expense id={} of {} piastres in group id={} paid by user id={} across {} participants",
+                expense.getId(), expense.getTotalAmount(), groupId,
+                expense.getPaidByUserId(), participants.size());
+
+        return ExpenseResponse.of(expense, participants);
+    }
+
+    /**
+     * The payer and every participant must belong to the group (FR-16, FR-17).
+     * <p>
+     * Checked together in one query so an expense naming several outsiders reports all of them,
+     * and so the payer is not a second round trip. The payer is included even when they are not a
+     * participant: paying for a group you do not belong to is not something to record.
+     */
+    private void requireEveryoneIsAMember(Long groupId, CreateExpenseRequest request) {
+        SequencedSet<Long> involved = new LinkedHashSet<>();
+        involved.add(request.paidByUserId());
+        involved.addAll(request.participantUserIds());
+
+        Set<Long> members = groupMemberRepository.findMemberIdsAmong(groupId, involved);
+        List<Long> outsiders = involved.stream()
+                .filter(userId -> !members.contains(userId))
+                .toList();
+
+        if (!outsiders.isEmpty()) {
+            throw new NonGroupMemberException(outsiders);
+        }
+    }
+}

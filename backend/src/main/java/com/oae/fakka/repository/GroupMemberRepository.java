@@ -8,6 +8,7 @@ import org.springframework.data.repository.query.Param;
 
 import java.util.Collection;
 import java.util.List;
+import java.util.Set;
 
 public interface GroupMemberRepository extends JpaRepository<GroupMember, Long> {
 
@@ -25,6 +26,22 @@ public interface GroupMemberRepository extends JpaRepository<GroupMember, Long> 
             order by u.name asc, u.id asc
             """)
     List<User> findMembersOf(@Param("groupId") Long groupId);
+
+    /**
+     * Of {@code candidateIds}, the ones that are members of {@code groupId}.
+     * <p>
+     * One query for the payer and every participant together, so an expense naming several
+     * outsiders reports them all at once instead of one per attempt. Callers must not pass an
+     * empty collection -- there is nothing to ask about, and an empty IN list is not portable SQL.
+     */
+    @Query("""
+            select m.userId
+            from GroupMember m
+            where m.groupId = :groupId
+              and m.userId in :candidateIds
+            """)
+    Set<Long> findMemberIdsAmong(
+            @Param("groupId") Long groupId, @Param("candidateIds") Collection<Long> candidateIds);
 
     /**
      * How many members each of {@code groupIds} has, for the dashboard cards (FR-4).
