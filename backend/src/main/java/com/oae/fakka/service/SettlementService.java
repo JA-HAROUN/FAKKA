@@ -69,6 +69,22 @@ public class SettlementService {
     }
 
     /**
+     * The settlements in a group that have been agreed but not yet paid (FR-34).
+     * <p>
+     * Kept separate from the suggested list on purpose: these are rows somebody created, and
+     * they do not affect any balance until they are marked paid. A client showing both is
+     * showing a to-do list beside a proposal, which is exactly the difference.
+     */
+    @Transactional(readOnly = true)
+    public List<SettlementResponse> listPendingSettlements(Long groupId) {
+        return settlementRepository
+                .findByGroupIdAndStatusOrderByCreatedAtAscIdAsc(groupId, SettlementStatus.PENDING)
+                .stream()
+                .map(SettlementResponse::from)
+                .toList();
+    }
+
+    /**
      * Records a settlement as PENDING (FR-34).
      * <p>
      * Nothing about the balances changes here, by design: agreeing to pay is not paying, so the

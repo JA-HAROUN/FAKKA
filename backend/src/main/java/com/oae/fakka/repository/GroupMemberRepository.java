@@ -27,6 +27,9 @@ public interface GroupMemberRepository extends JpaRepository<GroupMember, Long> 
             """)
     List<User> findMembersOf(@Param("groupId") Long groupId);
 
+    /** How many members one group has, for the single-group views. */
+    long countByGroupId(Long groupId);
+
     /**
      * Just the member ids of a group, ordered for a stable result.
      * <p>

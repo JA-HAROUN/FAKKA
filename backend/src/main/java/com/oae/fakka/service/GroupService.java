@@ -83,6 +83,20 @@ public class GroupService {
         return GroupResponse.of(group, members.size());
     }
 
+    /**
+     * One group and its size, for a screen that is about that group (FR-11).
+     * <p>
+     * Exists so the dashboard aggregator can ask for group information without reaching past the
+     * services into the repositories, which is the whole point of having it in one place.
+     */
+    @Transactional(readOnly = true)
+    public GroupResponse getGroup(Long groupId) {
+        Group group = groupRepository.findById(groupId)
+                .orElseThrow(() -> new ResourceNotFoundException("Group", groupId));
+
+        return GroupResponse.of(group, Math.toIntExact(groupMemberRepository.countByGroupId(groupId)));
+    }
+
     /** The members of a group, name and profile image, ordered for display (FR-11). */
     @Transactional(readOnly = true)
     public List<UserSummaryResponse> listMembers(Long groupId) {

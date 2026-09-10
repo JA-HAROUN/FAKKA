@@ -1,6 +1,7 @@
 package com.oae.fakka.repository;
 
 import com.oae.fakka.entity.Settlement;
+import com.oae.fakka.entity.SettlementStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -17,6 +18,15 @@ import java.util.List;
  * expense side, so the engine adds the same two shapes of number in both directions.
  */
 public interface SettlementRepository extends JpaRepository<Settlement, Long> {
+
+    /**
+     * Settlements in one group with one status, oldest first.
+     * <p>
+     * The status is a parameter here, unlike the sums below, because listing is not arithmetic:
+     * a caller asking for PENDING rows is reading a to-do list, not a balance.
+     */
+    List<Settlement> findByGroupIdAndStatusOrderByCreatedAtAscIdAsc(
+            Long groupId, SettlementStatus status);
 
     /** What one member has handed over in one group. Credited, like paying for an expense. */
     @Query("""

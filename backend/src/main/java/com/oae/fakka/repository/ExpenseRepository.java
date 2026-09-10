@@ -1,6 +1,9 @@
 package com.oae.fakka.repository;
 
 import com.oae.fakka.entity.Expense;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Slice;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -9,13 +12,50 @@ import java.util.Collection;
 import java.util.List;
 
 /**
- * The paid half of the balance engine (BR-4): an expense credits whoever paid it with its full
- * total, regardless of how the shares were divided.
+ * Expenses: the paid half of the balance engine (BR-4), and the reads behind the group dashboard
+ * and the CSV export.
  * <p>
- * Every sum is coalesced to 0, so "this user paid for nothing" comes back as a number rather
- * than a null that each caller would have to remember to unbox defensively.
+ * An expense credits whoever paid it with its full total, regardless of how the shares were
+ * divided. Every sum is coalesced to 0, so "this user paid for nothing" comes back as a number
+ * rather than a null that each caller would have to remember to unbox defensively.
  */
 public interface ExpenseRepository extends JpaRepository<Expense, Long> {
+
+    /** One page of a group expenses, newest first, for the dashboard (FR-11). */
+    Page<Expense> findByGroupIdOrderByCreatedAtDescIdDesc(Long groupId, Pageable pageable);
+
+    /** What the group has spent in total, across every expense (FR-36). */
+    @Query("""
+            select coalesce(sum(e.totalAmount), 0)
+            from Expense e
+            where e.groupId = :groupId
+            """)
+    long sumTotalInGroup(@Param("groupId") Long groupId);
+
+    /**
+     * One chunk of the CSV export: expenses joined to their shares, one row per participant.
+     * <p>
+     * Ordered oldest first, because a report reads as a history rather than a feed, and by id
+     * then share id so that two expenses recorded in the same instant never interleave.
+     * <p>
+     * A {@link Slice} rather than a {@link Page}: the export walks to the end regardless, so the
+     * count query a Page would run on every chunk would be paid for nothing.
+     */
+    @Query("""
+            select e.createdAt as createdAt,
+                   e.category as category,
+                   e.description as description,
+                   e.paidByUserId as payerUserId,
+                   p.userId as participantUserId,
+                   p.shareAmount as shareAmount,
+                   e.totalAmount as expenseTotal
+            from ExpenseParticipant p
+            join Expense e on e.id = p.expenseId
+            where e.groupId = :groupId
+            order by e.createdAt asc, e.id asc, p.id asc
+            """)
+    Slice<ExpenseShareRow> findShareRowsInGroup(
+            @Param("groupId") Long groupId, Pageable pageable);
 
     /** What one member paid into one group. */
     @Query("""

@@ -20,6 +20,12 @@ public interface ExpenseParticipantRepository extends JpaRepository<ExpenseParti
     /** Shares for one expense, in insertion order, which is the participant order from the request. */
     List<ExpenseParticipant> findByExpenseIdOrderByIdAsc(Long expenseId);
 
+    /**
+     * Shares for several expenses at once, so a page of the dashboard costs one query rather
+     * than one per expense. Callers must not pass an empty collection.
+     */
+    List<ExpenseParticipant> findByExpenseIdInOrderByExpenseIdAscIdAsc(Collection<Long> expenseIds);
+
     /** What one member owes across one group. */
     @Query("""
             select coalesce(sum(p.shareAmount), 0)

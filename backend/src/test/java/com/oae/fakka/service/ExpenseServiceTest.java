@@ -2,6 +2,7 @@ package com.oae.fakka.service;
 
 import com.oae.fakka.dto.CreateExpenseRequest;
 import com.oae.fakka.dto.ExpenseResponse;
+import com.oae.fakka.dto.PagedResponse;
 import com.oae.fakka.dto.SplitType;
 import com.oae.fakka.entity.Expense;
 import com.oae.fakka.entity.ExpenseCategory;
@@ -22,6 +23,9 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 
 import java.util.Collection;
 import java.util.LinkedHashMap;
@@ -76,6 +80,9 @@ class ExpenseServiceTest {
 
     @Captor
     private ArgumentCaptor<List<ExpenseParticipant>> participantsCaptor;
+
+    @Captor
+    private ArgumentCaptor<Collection<Long>> expenseIdsCaptor;
 
     @InjectMocks
     private ExpenseService expenseService;
@@ -256,6 +263,100 @@ class ExpenseServiceTest {
         assertThat(response.participants().stream().mapToLong(share -> share.shareAmount()).sum())
                 .as("BR-1 holds in the response too")
                 .isEqualTo(response.totalAmount());
+    }
+
+    /*
+     * Reading a page of expenses (FR-11). The interesting property is the query count: shares
+     * for the whole page come back in one lookup, not one per expense.
+     */
+
+    @Test
+    void listExpensesFetchesTheSharesForTheWholePageInOneQuery() {
+        givenGroupExists();
+        Expense dinner = expense(100L, "Dinner", 90_000L);
+        Expense uber = expense(101L, "Uber", 10_000L);
+        given(expenseRepository.findByGroupIdOrderByCreatedAtDescIdDesc(eq(GROUP_ID), any(Pageable.class)))
+                .willReturn(new PageImpl<>(List.of(dinner, uber), PageRequest.of(0, 20), 2));
+        given(expenseParticipantRepository.findByExpenseIdInOrderByExpenseIdAscIdAsc(anyCollection()))
+                .willReturn(List.of(
+                        share(100L, 1L, 45_000L), share(100L, 2L, 45_000L), share(101L, 1L, 10_000L)));
+
+        PagedResponse<ExpenseResponse> page = expenseService.listExpenses(GROUP_ID, 0, 20);
+
+        verify(expenseParticipantRepository, times(1))
+                .findByExpenseIdInOrderByExpenseIdAscIdAsc(expenseIdsCaptor.capture());
+        assertThat(expenseIdsCaptor.getValue()).containsExactly(100L, 101L);
+        assertThat(page.content())
+                .extracting(ExpenseResponse::id, expense -> expense.participants().size())
+                .containsExactly(tuple(100L, 2), tuple(101L, 1));
+        assertThat(page.totalElements()).isEqualTo(2);
+    }
+
+    /** An empty page must not hand the share lookup an empty IN list. */
+    @Test
+    void listExpensesSkipsTheShareQueryWhenThePageIsEmpty() {
+        givenGroupExists();
+        given(expenseRepository.findByGroupIdOrderByCreatedAtDescIdDesc(eq(GROUP_ID), any(Pageable.class)))
+                .willReturn(new PageImpl<>(List.of(), PageRequest.of(0, 20), 0));
+
+        PagedResponse<ExpenseResponse> page = expenseService.listExpenses(GROUP_ID, 0, 20);
+
+        assertThat(page.content()).isEmpty();
+        assertThat(page.totalElements()).isZero();
+        verifyNoInteractions(expenseParticipantRepository);
+    }
+
+    @Test
+    void listExpensesReports404ForAnUnknownGroup() {
+        given(groupRepository.existsById(99L)).willReturn(false);
+
+        assertThatThrownBy(() -> expenseService.listExpenses(99L, 0, 20))
+                .isInstanceOf(ResourceNotFoundException.class)
+                .hasMessage("Group 99 was not found");
+
+        verifyNoInteractions(expenseRepository, expenseParticipantRepository);
+    }
+
+    /** The window the caller asked for is the window the query gets. */
+    @Test
+    void listExpensesPassesThePagingWindowToTheQuery() {
+        givenGroupExists();
+        given(expenseRepository.findByGroupIdOrderByCreatedAtDescIdDesc(eq(GROUP_ID), any(Pageable.class)))
+                .willReturn(new PageImpl<>(List.of(), PageRequest.of(2, 50), 0));
+        ArgumentCaptor<Pageable> pageableCaptor = ArgumentCaptor.forClass(Pageable.class);
+
+        expenseService.listExpenses(GROUP_ID, 2, 50);
+
+        verify(expenseRepository).findByGroupIdOrderByCreatedAtDescIdDesc(
+                eq(GROUP_ID), pageableCaptor.capture());
+        assertThat(pageableCaptor.getValue().getPageNumber()).isEqualTo(2);
+        assertThat(pageableCaptor.getValue().getPageSize()).isEqualTo(50);
+    }
+
+    @Test
+    void totalExpensesCoversTheWholeGroup() {
+        given(expenseRepository.sumTotalInGroup(GROUP_ID)).willReturn(180_000L);
+
+        assertThat(expenseService.totalExpensesInGroup(GROUP_ID)).isEqualTo(180_000L);
+    }
+
+    private static Expense expense(Long id, String description, long totalAmount) {
+        return Expense.builder()
+                .id(id)
+                .groupId(GROUP_ID)
+                .category(ExpenseCategory.FOOD)
+                .description(description)
+                .totalAmount(totalAmount)
+                .paidByUserId(1L)
+                .build();
+    }
+
+    private static ExpenseParticipant share(Long expenseId, Long userId, long shareAmount) {
+        return ExpenseParticipant.builder()
+                .expenseId(expenseId)
+                .userId(userId)
+                .shareAmount(shareAmount)
+                .build();
     }
 
     private void givenGroupExists() {

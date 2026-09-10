@@ -231,6 +231,29 @@ class GroupServiceTest {
     }
 
     @Test
+    void getGroupReturnsTheGroupWithItsMemberCount() {
+        given(groupRepository.findById(10L)).willReturn(Optional.of(group(10L, "Dinner")));
+        given(groupMemberRepository.countByGroupId(10L)).willReturn(3L);
+
+        GroupResponse response = groupService.getGroup(10L);
+
+        assertThat(response.id()).isEqualTo(10L);
+        assertThat(response.name()).isEqualTo("Dinner");
+        assertThat(response.memberCount()).isEqualTo(3);
+    }
+
+    @Test
+    void getGroupReports404ForAnUnknownGroup() {
+        given(groupRepository.findById(99L)).willReturn(Optional.empty());
+
+        assertThatThrownBy(() -> groupService.getGroup(99L))
+                .isInstanceOf(ResourceNotFoundException.class)
+                .hasMessage("Group 99 was not found");
+
+        verify(groupMemberRepository, never()).countByGroupId(anyLong());
+    }
+
+    @Test
     void listGroupsForUserReturnsOneCardPerGroupWithItsMemberCount() {
         given(userRepository.existsById(1L)).willReturn(true);
         given(groupRepository.findGroupsOf(1L)).willReturn(List.of(group(10L, "Dinner"), group(11L, "Trip")));

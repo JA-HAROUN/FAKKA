@@ -2,6 +2,7 @@ package com.oae.fakka.service;
 
 import com.oae.fakka.dto.CreateExpenseRequest;
 import com.oae.fakka.dto.ExpenseResponse;
+import com.oae.fakka.dto.PagedResponse;
 import com.oae.fakka.entity.Expense;
 import com.oae.fakka.entity.ExpenseParticipant;
 import com.oae.fakka.exception.NonGroupMemberException;
@@ -11,6 +12,8 @@ import com.oae.fakka.repository.ExpenseRepository;
 import com.oae.fakka.repository.GroupMemberRepository;
 import com.oae.fakka.repository.GroupRepository;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -21,9 +24,10 @@ import java.util.Map;
 import java.util.SequencedMap;
 import java.util.SequencedSet;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
- * Recording expenses (FR-12 to FR-19).
+ * Recording and reading expenses (FR-12 to FR-19, FR-11).
  * <p>
  * The arithmetic lives in {@link ExpenseSplitService}; this owns the parts that need the
  * database: the group exists, everyone named is a member of it, and the expense plus its shares
@@ -102,6 +106,55 @@ public class ExpenseService {
                 expense.getPaidByUserId(), participants.size());
 
         return ExpenseResponse.of(expense, participants);
+    }
+
+    /**
+     * One page of a group expenses, newest first, each with its shares (FR-11).
+     * <p>
+     * Two queries per page, never one per expense: the page of expenses, then every share for
+     * those expense ids in a single lookup. A list that fetched shares per row would turn a
+     * twenty-expense page into twenty-one queries.
+     * <p>
+     * The sort is fixed rather than taken from the caller. A dashboard reads newest first, and a
+     * client-chosen sort would be one more thing to validate and index for no gain here.
+     */
+    @Transactional(readOnly = true)
+    public PagedResponse<ExpenseResponse> listExpenses(Long groupId, int page, int size) {
+        if (!groupRepository.existsById(groupId)) {
+            throw new ResourceNotFoundException("Group", groupId);
+        }
+
+        Page<Expense> expenses = expenseRepository.findByGroupIdOrderByCreatedAtDescIdDesc(
+                groupId, PageRequest.of(page, size));
+
+        Map<Long, List<ExpenseParticipant>> sharesByExpense = sharesOf(expenses.getContent());
+
+        return PagedResponse.of(expenses, expense -> ExpenseResponse.of(
+                expense, sharesByExpense.getOrDefault(expense.getId(), List.of())));
+    }
+
+    /**
+     * Everything the group has spent (FR-11, FR-36).
+     * <p>
+     * Over every expense, not over a page: a total that changed when the reader turned the page
+     * would be worse than no total at all.
+     */
+    @Transactional(readOnly = true)
+    public long totalExpensesInGroup(Long groupId) {
+        return expenseRepository.sumTotalInGroup(groupId);
+    }
+
+    /** Shares for a page of expenses, grouped by expense, in one query. */
+    private Map<Long, List<ExpenseParticipant>> sharesOf(List<Expense> expenses) {
+        if (expenses.isEmpty()) {
+            // Nothing to look up, and an empty IN list is not portable SQL.
+            return Map.of();
+        }
+
+        List<Long> expenseIds = expenses.stream().map(Expense::getId).toList();
+        return expenseParticipantRepository.findByExpenseIdInOrderByExpenseIdAscIdAsc(expenseIds)
+                .stream()
+                .collect(Collectors.groupingBy(ExpenseParticipant::getExpenseId));
     }
 
     /**
