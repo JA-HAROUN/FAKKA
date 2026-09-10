@@ -56,6 +56,7 @@ For every table/model, consider: primary/foreign keys, unique constraints, nulla
 
 ## 11. API Design
 Consistent, predictable, versioned where needed, always authenticated/authorized/validated. Prefer domain-oriented endpoints (`POST /trips/:id/expenses`) over exposing raw DB operations.
+Any api endpoints in the backend must be documented by swagger
 
 ## 12. Performance
 Ensure correctness first, then check: N+1 queries, missing indexes, unnecessary calls, large unpaginated payloads, caching opportunities (only for data where staleness is acceptable).
