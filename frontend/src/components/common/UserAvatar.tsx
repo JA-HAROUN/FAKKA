@@ -2,11 +2,22 @@ import { cn } from "@/lib/utils";
 import type { User } from "@/types";
 
 const sizes = {
-  sm: "size-8 text-sm",
-  md: "size-10 text-base",
-  lg: "size-14 text-2xl",
-};
+  xs: "size-6 text-[11px]",
+  sm: "size-8 text-xs",
+  md: "size-9 text-sm",
+  lg: "size-12 text-base",
+} as const;
 
+function initials(name: string): string {
+  return name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase() ?? "")
+    .join("");
+}
+
+/** Emoji avatars come from the user record; anything else falls back to initials. */
 export function UserAvatar({
   user,
   size = "md",
@@ -16,33 +27,50 @@ export function UserAvatar({
   size?: keyof typeof sizes;
   className?: string;
 }) {
+  const isEmoji = Boolean(user.avatar) && !/^[a-z0-9\s]+$/i.test(user.avatar);
   return (
     <span
-      title={user.name}
+      aria-hidden
       className={cn(
-        "inline-flex shrink-0 items-center justify-center rounded-full bg-primary-soft ring-2 ring-card select-none",
+        "inline-flex shrink-0 items-center justify-center rounded-full border border-border bg-surface font-medium text-muted-foreground select-none",
         sizes[size],
         className,
       )}
     >
-      {user.avatar}
+      {isEmoji ? user.avatar : initials(user.name)}
     </span>
   );
 }
 
-export function AvatarStack({ users, max = 4 }: { users: User[]; max?: number }) {
+export function AvatarStack({
+  users,
+  max = 4,
+  size = "sm",
+  className,
+}: {
+  users: User[];
+  max?: number;
+  size?: keyof typeof sizes;
+  className?: string;
+}) {
   const shown = users.slice(0, max);
   const rest = users.length - shown.length;
   return (
-    <div className="flex items-center -space-x-2">
+    <div className={cn("flex items-center -space-x-1.5", className)}>
       {shown.map((u) => (
-        <UserAvatar key={u.id} user={u} size="sm" />
+        <UserAvatar key={u.id} user={u} size={size} className="ring-2 ring-card" />
       ))}
       {rest > 0 && (
-        <span className="inline-flex size-8 items-center justify-center rounded-full bg-muted text-xs font-medium text-muted-foreground ring-2 ring-card">
+        <span
+          className={cn(
+            "inline-flex items-center justify-center rounded-full border border-border bg-surface font-medium text-muted-foreground ring-2 ring-card",
+            sizes[size],
+          )}
+        >
           +{rest}
         </span>
       )}
+      <span className="sr-only">{users.map((u) => u.name).join(", ")}</span>
     </div>
   );
 }

@@ -1,21 +1,16 @@
 import { useState } from "react";
-import { Plus, ArrowLeft } from "lucide-react";
+import { ArrowLeft, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Money } from "@/components/common/Money";
+import { ResponsiveModal } from "@/components/common/ResponsiveModal";
 import { UserAvatar } from "@/components/common/UserAvatar";
 import { useApp } from "@/context/AppContext";
 import type { ExpenseDraft, Group } from "@/types";
 import { getCategory } from "@/utils/categories";
 import { equalShares, formatAmount } from "@/utils/calculations";
+import { formatNumber, pluralize } from "@/utils/format";
 import { ManualExpenseForm, draftError } from "./ManualExpenseForm";
 import { AiExpenseInput } from "./AiExpenseInput";
 
@@ -61,136 +56,154 @@ export function AddExpenseModal({ group }: { group: Group }) {
     setReviewing(true);
   }
 
+  function save() {
+    addExpense(group.id, draft);
+    setOpen(false);
+    reset();
+    toast.success("Expense added", {
+      description: `${draft.description} · ${formatAmount(draft.totalAmount)}`,
+    });
+  }
+
   const category = getCategory(draft.category);
 
   return (
-    <Dialog
+    <ResponsiveModal
       open={open}
       onOpenChange={(v) => {
         setOpen(v);
         if (!v) reset();
       }}
-    >
-      <DialogTrigger asChild>
-        <Button size="lg" className="rounded-full">
-          <Plus className="size-4" /> Add expense
+      trigger={
+        <Button>
+          <Plus aria-hidden /> Add expense
         </Button>
-      </DialogTrigger>
-      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
-        <DialogHeader>
-          <DialogTitle>{reviewing ? "Review expense" : "Add an expense"}</DialogTitle>
-          <DialogDescription>
-            {reviewing
-              ? "Check the details, then save it to the group."
-              : "Type it in, or describe it in plain language."}
-          </DialogDescription>
-        </DialogHeader>
-
-        {reviewing ? (
-          <div className="space-y-4">
-            <div className="card-soft space-y-3 p-4">
-              <div className="flex items-center gap-3">
-                <span className="grid size-11 place-items-center rounded-xl bg-primary-soft">
-                  <category.icon className="size-5" />
-                </span>
-                <div className="min-w-0 flex-1">
-                  <p className="truncate font-semibold">{draft.description}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {category.label} · paid by {userById(draft.paidBy).name}
-                  </p>
-                </div>
-                <p className="font-bold tabular-nums">{formatAmount(draft.totalAmount)}</p>
+      }
+      className="sm:max-w-2xl"
+      title={reviewing ? "Review expense" : "Add an expense"}
+      description={
+        reviewing
+          ? "Check the details before it's saved to the group."
+          : `Splitting between ${pluralize(members.length, "member")} of ${group.name}.`
+      }
+      footer={
+        reviewing ? (
+          <>
+            <Button variant="ghost" onClick={() => setReviewing(false)}>
+              <ArrowLeft aria-hidden /> Back to edit
+            </Button>
+            <Button onClick={save}>Save expense</Button>
+          </>
+        ) : undefined
+      }
+    >
+      {reviewing ? (
+        <div className="space-y-4">
+          <div className="panel-inset divide-y divide-border">
+            <div className="flex items-center gap-3 p-4">
+              <span
+                className="grid size-10 shrink-0 place-items-center rounded-lg border border-border bg-card text-muted-foreground"
+                aria-hidden
+              >
+                <category.icon className="size-4" />
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-semibold">{draft.description}</p>
+                <p className="truncate text-xs text-muted-foreground">
+                  {category.label} · paid by {userById(draft.paidBy).name}
+                </p>
               </div>
+              <Money value={draft.totalAmount} size="lg" />
+            </div>
 
-              <ul className="divide-y divide-border border-t border-border pt-2">
+            <div className="p-4">
+              <p className="text-xs font-medium text-muted-foreground">
+                Split {draft.splitType === "equal" ? "equally" : "by custom amounts"} between{" "}
+                {pluralize(draft.participants.length, "person", "people")}
+              </p>
+              <ul className="mt-2 space-y-2">
                 {draft.participants.map((id) => (
-                  <li key={id} className="flex items-center gap-3 py-2">
-                    <UserAvatar user={userById(id)} size="sm" />
-                    <span className="flex-1 truncate text-sm font-medium">
+                  <li key={id} className="flex items-center gap-3">
+                    <UserAvatar user={userById(id)} size="xs" />
+                    <span className="min-w-0 flex-1 truncate text-[13px]">
                       {userById(id).name}
+                      {id === currentUser?.id && (
+                        <span className="ml-1.5 text-xs text-muted-foreground">you</span>
+                      )}
                     </span>
-                    <span className="text-sm tabular-nums text-muted-foreground">
-                      {formatAmount(draft.shares[id] ?? 0)}
+                    <span className="text-[13px] font-medium tabular-nums">
+                      {formatNumber(draft.shares[id] ?? 0)}
                     </span>
                   </li>
                 ))}
               </ul>
-
-              {draft.items && draft.items.length > 0 && (
-                <div className="rounded-xl bg-secondary p-3">
-                  <p className="text-xs font-semibold text-muted-foreground">Scanned items</p>
-                  <ul className="mt-1 space-y-1 text-sm">
-                    {draft.items.map((item) => (
-                      <li key={item.id} className="flex justify-between gap-3">
-                        <span className="truncate">
-                          {item.quantity}× {item.name}
-                        </span>
-                        <span className="tabular-nums">
-                          {formatAmount(item.price * item.quantity)}
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
             </div>
 
-            <div className="flex flex-wrap justify-end gap-2">
-              <Button variant="ghost" onClick={() => setReviewing(false)}>
-                <ArrowLeft className="size-4" /> Back to edit
-              </Button>
-              <Button
-                onClick={() => {
-                  addExpense(group.id, draft);
-                  setOpen(false);
-                  reset();
-                  toast.success("Expense added");
-                }}
-              >
-                Save expense
-              </Button>
-            </div>
+            {draft.items && draft.items.length > 0 && (
+              <div className="p-4">
+                <p className="text-xs font-medium text-muted-foreground">
+                  Items recorded ({draft.items.length})
+                </p>
+                <ul className="mt-2 space-y-1.5 text-[13px]">
+                  {draft.items.map((item) => (
+                    <li key={item.id} className="flex justify-between gap-3">
+                      <span className="min-w-0 truncate">
+                        {item.quantity}× {item.name || "Unnamed item"}
+                      </span>
+                      <span className="shrink-0 tabular-nums">
+                        {formatNumber(item.price * item.quantity)}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
           </div>
-        ) : (
-          <Tabs value={method} onValueChange={(v) => setMethod(v as Method)}>
-            <TabsList className="w-full">
-              <TabsTrigger value="manual" className="flex-1">
-                Manual
-              </TabsTrigger>
-              <TabsTrigger value="ai" className="flex-1">
-                Describe it
-              </TabsTrigger>
-            </TabsList>
 
-            <TabsContent value="manual" className="mt-4">
-              <ManualExpenseForm
-                members={members}
-                draft={draft}
-                setDraft={(d) => {
-                  setDraft(d);
-                  setError(null);
-                }}
-                onContinue={() => goToReview(draft)}
-                error={error}
-              />
-            </TabsContent>
+          {draft.source !== "manual" && (
+            <p className="text-xs text-muted-foreground">
+              Filled in from your description — edit anything that looks wrong before saving.
+            </p>
+          )}
+        </div>
+      ) : (
+        <Tabs value={method} onValueChange={(v) => setMethod(v as Method)}>
+          <TabsList className="w-full">
+            <TabsTrigger value="manual" className="flex-1">
+              Enter manually
+            </TabsTrigger>
+            <TabsTrigger value="ai" className="flex-1">
+              Describe it
+            </TabsTrigger>
+          </TabsList>
 
-            <TabsContent value="ai" className="mt-4">
-              <AiExpenseInput
-                members={members}
-                fallbackPayer={payer}
-                onParsed={(d) => {
-                  setDraft(d);
-                  setMethod("manual");
-                  setError(null);
-                }}
-                onSwitchToManual={() => setMethod("manual")}
-              />
-            </TabsContent>
+          <TabsContent value="manual">
+            <ManualExpenseForm
+              members={members}
+              draft={draft}
+              setDraft={(d) => {
+                setDraft(d);
+                setError(null);
+              }}
+              onContinue={() => goToReview(draft)}
+              error={error}
+            />
+          </TabsContent>
 
-          </Tabs>
-        )}
-      </DialogContent>
-    </Dialog>
+          <TabsContent value="ai">
+            <AiExpenseInput
+              members={members}
+              fallbackPayer={payer}
+              onParsed={(d) => {
+                setDraft(d);
+                setMethod("manual");
+                setError(null);
+              }}
+              onSwitchToManual={() => setMethod("manual")}
+            />
+          </TabsContent>
+        </Tabs>
+      )}
+    </ResponsiveModal>
   );
 }

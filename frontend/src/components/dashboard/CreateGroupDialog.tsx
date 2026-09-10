@@ -1,23 +1,17 @@
 import { useState } from "react";
-import { useNavigate } from "@tanstack/react-router";
+import { Link, useNavigate } from "@tanstack/react-router";
 import { Plus } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Field, FormError } from "@/components/common/Field";
+import { ResponsiveModal } from "@/components/common/ResponsiveModal";
 import { UserAvatar } from "@/components/common/UserAvatar";
 import { useApp } from "@/context/AppContext";
 import { cn } from "@/lib/utils";
+import { pluralize } from "@/utils/format";
 
 const EMOJIS = ["🍝", "🐫", "🏠", "✈️", "🎉", "🏖️", "☕", "🎬", "🛒", "⚽", "🎓", "🚗"] as const;
 
@@ -28,125 +22,151 @@ export function CreateGroupDialog() {
   const [name, setName] = useState("");
   const [image, setImage] = useState<string>(EMOJIS[0]);
   const [selected, setSelected] = useState<string[]>([]);
-  const [error, setError] = useState("");
+  const [errors, setErrors] = useState<{ name?: string; members?: string }>({});
 
   function reset() {
     setName("");
     setImage(EMOJIS[0]);
     setSelected([]);
-    setError("");
+    setErrors({});
+  }
+
+  function submit() {
+    const next: typeof errors = {};
+    if (!name.trim()) next.name = "Give your group a name.";
+    if (selected.length === 0) next.members = "Pick at least one friend to split with.";
+    setErrors(next);
+    if (Object.keys(next).length > 0) return;
+
+    const group = createGroup({
+      name: name.trim(),
+      image,
+      memberIds: [currentUser!.id, ...selected],
+    });
+    setOpen(false);
+    reset();
+    toast.success(`${group.name} created`, {
+      description: `${pluralize(group.members.length, "member")} · start adding expenses`,
+    });
+    void navigate({ to: "/group/$groupId", params: { groupId: group.id } });
   }
 
   return (
-    <Dialog
+    <ResponsiveModal
       open={open}
       onOpenChange={(v) => {
         setOpen(v);
         if (!v) reset();
       }}
-    >
-      <DialogTrigger asChild>
-        <Button size="lg" className="rounded-full">
-          <Plus className="size-4" /> Create group
+      trigger={
+        <Button>
+          <Plus className="size-4" aria-hidden /> New group
         </Button>
-      </DialogTrigger>
-      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
-        <DialogHeader>
-          <DialogTitle>Create a group</DialogTitle>
-          <DialogDescription>Pick a name, an icon and who's in it.</DialogDescription>
-        </DialogHeader>
-
-        <div className="space-y-5">
-          <div className="space-y-2">
-            <Label htmlFor="group-name">Group name</Label>
-            <Input
-              id="group-name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Weekend in Dahab"
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label>Group icon</Label>
-            <div className="flex flex-wrap gap-2">
-              {EMOJIS.map((e) => (
-                <button
-                  key={e}
-                  type="button"
-                  onClick={() => setImage(e)}
-                  className={cn(
-                    "grid size-11 place-items-center rounded-xl border text-xl transition-colors",
-                    image === e ? "border-primary bg-primary-soft" : "border-border bg-card",
-                  )}
-                >
-                  {e}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <Label>Add friends</Label>
-            {friends.length === 0 ? (
-              <p className="text-sm text-muted-foreground">
-                No friends yet — add some from the Friends page first.
-              </p>
-            ) : (
-              <div className="space-y-1">
-                {friends.map((f) => (
-                  <label
-                    key={f.id}
-                    className="flex cursor-pointer items-center gap-3 rounded-xl px-2 py-2 hover:bg-secondary"
-                  >
-                    <Checkbox
-                      checked={selected.includes(f.id)}
-                      onCheckedChange={(v) =>
-                        setSelected((prev) =>
-                          v ? [...prev, f.id] : prev.filter((id) => id !== f.id),
-                        )
-                      }
-                    />
-                    <UserAvatar user={f} size="sm" />
-                    <span className="text-sm font-medium">{f.name}</span>
-                  </label>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {error && <p className="text-sm text-negative">{error}</p>}
-        </div>
-
-        <DialogFooter>
+      }
+      title="Create a group"
+      description="Name it, pick an icon, and choose who's splitting."
+      footer={
+        <>
           <Button variant="ghost" onClick={() => setOpen(false)}>
             Cancel
           </Button>
-          <Button
-            onClick={() => {
-              if (!name.trim()) {
-                setError("Give your group a name.");
-                return;
-              }
-              if (selected.length === 0) {
-                setError("Pick at least one friend.");
-                return;
-              }
-              const group = createGroup({
-                name: name.trim(),
-                image,
-                memberIds: [currentUser!.id, ...selected],
-              });
-              setOpen(false);
-              reset();
-              toast.success(`"${group.name}" created`);
-              navigate({ to: "/group/$groupId", params: { groupId: group.id } });
-            }}
-          >
-            Create group
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+          <Button onClick={submit}>Create group</Button>
+        </>
+      }
+    >
+      <div className="space-y-5">
+        <Field label="Group name" error={errors.name} required>
+          {(field) => (
+            <Input
+              {...field}
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Weekend in Dahab"
+              autoFocus
+            />
+          )}
+        </Field>
+
+        <fieldset className="space-y-2">
+          <legend className="text-[13px] font-medium">Icon</legend>
+          <div className="grid grid-cols-6 gap-1.5" role="radiogroup" aria-label="Group icon">
+            {EMOJIS.map((emoji) => {
+              const active = image === emoji;
+              return (
+                <button
+                  key={emoji}
+                  type="button"
+                  role="radio"
+                  aria-checked={active}
+                  aria-label={`Icon ${emoji}`}
+                  onClick={() => setImage(emoji)}
+                  className={cn(
+                    "grid h-10 cursor-pointer place-items-center rounded-lg border text-lg transition-colors",
+                    active
+                      ? "border-primary bg-primary-soft"
+                      : "border-border bg-card hover:bg-surface",
+                  )}
+                >
+                  {emoji}
+                </button>
+              );
+            })}
+          </div>
+        </fieldset>
+
+        <div className="space-y-2">
+          <div className="flex items-baseline justify-between gap-3">
+            <Label className="text-[13px] font-medium">Members</Label>
+            <span className="text-xs text-muted-foreground">
+              {selected.length > 0 ? `${selected.length} selected` : "You're included"}
+            </span>
+          </div>
+
+          {friends.length === 0 ? (
+            <div className="panel-inset px-4 py-5 text-center">
+              <p className="text-sm text-muted-foreground">
+                You haven't added any friends yet.{" "}
+                <Link
+                  to="/friends"
+                  className="font-medium text-primary hover:underline"
+                  onClick={() => setOpen(false)}
+                >
+                  Add a friend
+                </Link>{" "}
+                to create a group.
+              </p>
+            </div>
+          ) : (
+            <ul className="max-h-60 overflow-y-auto rounded-lg border border-border">
+              {friends.map((friend) => {
+                const checked = selected.includes(friend.id);
+                return (
+                  <li key={friend.id} className="border-b border-border last:border-b-0">
+                    <label className="row-hover flex cursor-pointer items-center gap-3 px-3 py-2.5">
+                      <Checkbox
+                        checked={checked}
+                        onCheckedChange={(v) =>
+                          setSelected((prev) =>
+                            v ? [...prev, friend.id] : prev.filter((id) => id !== friend.id),
+                          )
+                        }
+                      />
+                      <UserAvatar user={friend} size="sm" />
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-sm font-medium">{friend.name}</span>
+                        <span className="block truncate text-xs text-muted-foreground">
+                          {friend.email}
+                        </span>
+                      </span>
+                    </label>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+          <FormError message={errors.members} />
+        </div>
+      </div>
+    </ResponsiveModal>
   );
 }

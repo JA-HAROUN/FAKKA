@@ -1,54 +1,72 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { Field, FormError } from "@/components/common/Field";
+import { PasswordInput } from "@/components/auth/PasswordInput";
 import { useApp } from "@/context/AppContext";
 
 export function LoginForm({ onSuccess }: { onSuccess: () => void }) {
   const { signIn } = useApp();
-  const [email, setEmail] = useState("john@splitease.app");
+  const [email, setEmail] = useState("john@fakka.app");
   const [password, setPassword] = useState("demo1234");
-  const [error, setError] = useState("");
+  const [errors, setErrors] = useState<{ email?: string; password?: string; form?: string }>({});
+
+  function submit() {
+    const next: typeof errors = {};
+    if (!email.trim()) next.email = "Enter the email you signed up with.";
+    if (!password.trim()) next.password = "Enter your password.";
+    setErrors(next);
+    if (Object.keys(next).length > 0) return;
+
+    if (!signIn(email)) {
+      setErrors({ form: "We couldn't match those details. Check the email and try again." });
+      return;
+    }
+    onSuccess();
+  }
 
   return (
     <form
       className="space-y-4"
+      noValidate
       onSubmit={(e) => {
         e.preventDefault();
-        if (!email.trim() || !password.trim()) {
-          setError("Enter your email and password.");
-          return;
-        }
-        signIn(email);
-        onSuccess();
+        submit();
       }}
     >
-      <div className="space-y-2">
-        <Label htmlFor="login-email">Email</Label>
-        <Input
-          id="login-email"
-          type="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          placeholder="you@example.com"
-        />
-      </div>
-      <div className="space-y-2">
-        <Label htmlFor="login-password">Password</Label>
-        <Input
-          id="login-password"
-          type="password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          placeholder="••••••••"
-        />
-      </div>
-      {error && <p className="text-sm text-negative">{error}</p>}
-      <Button type="submit" className="w-full" size="lg">
+      <Field label="Email" error={errors.email}>
+        {(field) => (
+          <Input
+            {...field}
+            type="email"
+            autoComplete="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="you@example.com"
+          />
+        )}
+      </Field>
+
+      <Field label="Password" error={errors.password}>
+        {(field) => (
+          <PasswordInput
+            {...field}
+            autoComplete="current-password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="Your password"
+          />
+        )}
+      </Field>
+
+      <FormError message={errors.form} />
+
+      <Button type="submit" size="lg" className="w-full">
         Sign in
       </Button>
+
       <p className="text-center text-xs text-muted-foreground">
-        Demo mode — any password works with a sample account.
+        Demo account is pre-filled — any password works.
       </p>
     </form>
   );

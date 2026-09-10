@@ -15,7 +15,11 @@ const CATEGORY_HINTS: Record<CategoryId, string[]> = {
  * Mocked "AI" parser. Swap the body for a real API call later — the return
  * shape is the same ExpenseDraft the manual form edits.
  */
-export function parseExpenseText(text: string, members: User[], fallbackPayer: string): ExpenseDraft {
+export function parseExpenseText(
+  text: string,
+  members: User[],
+  fallbackPayer: string,
+): ExpenseDraft {
   const lower = text.toLowerCase();
 
   const amountMatch = lower.match(/(\d[\d,]*(?:\.\d+)?)\s*(?:egp|le|pounds?)?/);

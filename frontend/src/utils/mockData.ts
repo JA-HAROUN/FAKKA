@@ -4,19 +4,19 @@ import { equalShares } from "./calculations";
 export const CURRENT_USER_ID = "u1";
 
 export const mockUsers: User[] = [
-  { id: "u1", name: "John William", email: "john@splitease.app", avatar: "🧑‍💻" },
-  { id: "u2", name: "Ahmed Hassan", email: "ahmed@splitease.app", avatar: "🧔" },
-  { id: "u3", name: "Mohamed Salah", email: "mohamed@splitease.app", avatar: "⚽" },
-  { id: "u4", name: "Nour Ibrahim", email: "nour@splitease.app", avatar: "👩‍🎨" },
-  { id: "u5", name: "Layla Fahmy", email: "layla@splitease.app", avatar: "👩‍🔬" },
+  { id: "u1", name: "John William", email: "john@fakka.app", avatar: "🧑‍💻" },
+  { id: "u2", name: "Ahmed Hassan", email: "ahmed@fakka.app", avatar: "🧔" },
+  { id: "u3", name: "Mohamed Salah", email: "mohamed@fakka.app", avatar: "⚽" },
+  { id: "u4", name: "Nour Ibrahim", email: "nour@fakka.app", avatar: "👩‍🎨" },
+  { id: "u5", name: "Layla Fahmy", email: "layla@fakka.app", avatar: "👩‍🔬" },
 ];
 
 /** Directory of people you can discover by email/username when adding a friend. */
 export const discoverableUsers: User[] = [
-  { id: "u6", name: "Omar Tarek", email: "omar@splitease.app", avatar: "🎧" },
-  { id: "u7", name: "Sara Adel", email: "sara@splitease.app", avatar: "🌷" },
-  { id: "u8", name: "Karim Zaki", email: "karim@splitease.app", avatar: "🏀" },
-  { id: "u9", name: "Hana Youssef", email: "hana@splitease.app", avatar: "📚" },
+  { id: "u6", name: "Omar Tarek", email: "omar@fakka.app", avatar: "🎧" },
+  { id: "u7", name: "Sara Adel", email: "sara@fakka.app", avatar: "🌷" },
+  { id: "u8", name: "Karim Zaki", email: "karim@fakka.app", avatar: "🏀" },
+  { id: "u9", name: "Hana Youssef", email: "hana@fakka.app", avatar: "📚" },
 ];
 
 export const mockGroups: Group[] = [

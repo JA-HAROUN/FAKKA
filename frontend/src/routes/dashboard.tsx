@@ -1,20 +1,27 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { Link, createFileRoute } from "@tanstack/react-router";
+import { Users } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { RequireAuth } from "@/components/common/RequireAuth";
-import { BalanceSummary } from "@/components/dashboard/BalanceSummary";
-import { CreateGroupDialog } from "@/components/dashboard/CreateGroupDialog";
-import { GroupCard } from "@/components/dashboard/GroupCard";
 import { EmptyState } from "@/components/common/EmptyState";
+import { PageHeader, Panel, PanelList, Section } from "@/components/common/Section";
+import { ActivityFeed } from "@/components/dashboard/ActivityFeed";
+import { CreateGroupDialog } from "@/components/dashboard/CreateGroupDialog";
+import { GroupRow } from "@/components/dashboard/GroupRow";
+import { PeopleBalances } from "@/components/dashboard/PeopleBalances";
+import { PositionSummary } from "@/components/dashboard/PositionSummary";
 import { useApp } from "@/context/AppContext";
+import { useGroupSummaries } from "@/hooks/useGroupSummaries";
+import { firstName, pluralize } from "@/utils/format";
 
 export const Route = createFileRoute("/dashboard")({
   head: () => ({
     meta: [
-      { title: "Your groups — Fakka" },
+      { title: "Overview — Fakka" },
       {
         name: "description",
         content: "See every group you share expenses with and what you owe or are owed.",
       },
-      { property: "og:title", content: "Your groups — Fakka" },
+      { property: "og:title", content: "Overview — Fakka" },
       {
         property: "og:description",
         content: "All your shared expense groups and balances in one place.",
@@ -29,39 +36,65 @@ export const Route = createFileRoute("/dashboard")({
 });
 
 function DashboardPage() {
-  const { groups, currentUser } = useApp();
-  const myGroups = groups.filter((g) => currentUser && g.members.includes(currentUser.id));
+  const { currentUser } = useApp();
+  const { summaries, position, people, activity } = useGroupSummaries();
+
+  // With no groups there is nothing to summarise, so the first run gets one
+  // clear next step instead of three empty panels.
+  if (summaries.length === 0) {
+    return (
+      <div className="space-y-6">
+        <PageHeader
+          title={`Hello, ${firstName(currentUser?.name ?? "there")}`}
+          description="Create your first group to start splitting expenses."
+        />
+        <EmptyState
+          icon={Users}
+          title="No groups yet"
+          description="A group is where you and your friends track what everyone spends. Add the people you split with, then create a group."
+          className="py-14"
+          action={
+            <div className="flex flex-wrap items-center justify-center gap-2">
+              <CreateGroupDialog />
+              <Button asChild variant="outline">
+                <Link to="/friends">Manage friends</Link>
+              </Button>
+            </div>
+          }
+        />
+      </div>
+    );
+  }
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">
-            Hey {currentUser?.name.split(" ")[0]} 👋
-          </h1>
-          <p className="text-sm text-muted-foreground">Here's where your money stands.</p>
+    <div className="space-y-6 lg:space-y-8">
+      <PageHeader
+        title={`Hello, ${firstName(currentUser?.name ?? "there")}`}
+        description={`Your position across ${pluralize(summaries.length, "group")}.`}
+        actions={<CreateGroupDialog />}
+      />
+
+      <PositionSummary position={position} summaries={summaries} />
+
+      <div className="grid gap-6 lg:gap-8 xl:grid-cols-[minmax(0,1fr)_22rem] 2xl:grid-cols-[minmax(0,1fr)_24rem]">
+        <div className="min-w-0 space-y-6 lg:space-y-8">
+          <Section title="Your groups" description="Most recently active first.">
+            <Panel flush>
+              <PanelList>
+                {summaries.map((summary) => (
+                  <GroupRow key={summary.group.id} summary={summary} />
+                ))}
+              </PanelList>
+            </Panel>
+          </Section>
+
+          <ActivityFeed activity={activity} />
         </div>
-        <CreateGroupDialog />
+
+        <div className="min-w-0">
+          <PeopleBalances people={people} />
+        </div>
       </div>
-
-      <BalanceSummary />
-
-      <section className="space-y-3">
-        <h2 className="text-base font-semibold">Your groups</h2>
-        {myGroups.length === 0 ? (
-          <EmptyState
-            emoji="👥"
-            title="No groups yet"
-            description="Create a group to start splitting expenses with your friends."
-          />
-        ) : (
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {myGroups.map((g) => (
-              <GroupCard key={g.id} group={g} />
-            ))}
-          </div>
-        )}
-      </section>
     </div>
   );
 }
