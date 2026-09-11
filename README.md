@@ -113,12 +113,6 @@ FAKKA/
 
 ---
 
-## 🔗 Live Demo
-
-Try FAKKA here: **[fakka.app](https://fakka.app)** *(replace with your actual deployed URL)*
-
----
-
 ## 🚀 Getting Started
 
 ### Prerequisites
